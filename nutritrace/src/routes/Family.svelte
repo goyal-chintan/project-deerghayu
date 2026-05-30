@@ -199,8 +199,8 @@
             <div class="m-header">
               <h3>{m.name}</h3>
               <div class="m-actions">
-                <button class="icon-btn sm" on:click={() => editMember(m)}><span class="material-symbols-rounded">edit</span></button>
-                <button class="icon-btn sm danger" on:click={() => remove(m.id)}><span class="material-symbols-rounded">delete</span></button>
+                <button class="icon-btn sm" aria-label="Edit member" on:click={() => editMember(m)}><span class="material-symbols-rounded">edit</span></button>
+                <button class="icon-btn sm danger" aria-label="Delete member" on:click={() => remove(m.id)}><span class="material-symbols-rounded">delete</span></button>
               </div>
             </div>
             <div class="m-demographics text-2">
@@ -319,7 +319,7 @@
         </label>
 
         {#if previewTargets}
-          <div class="preview-targets-box mt-3 p-3" style="background: var(--bg-2); border-radius: var(--radius-md); border: 1px solid var(--border);">
+          <div class="preview-targets-box mt-3 p-3" style="background: var(--surface-2); border-radius: var(--radius-md); border: 1px solid var(--border);">
             <h4 class="text-xs uppercase tracking-wide text-3 mb-2" style="font-weight: 700; font-size: 11px;">Predicted Science Targets (Preview)</h4>
             <div style="display: flex; justify-content: space-between; text-align: center; font-size: 12px;">
               <div>
@@ -412,7 +412,7 @@
     margin-bottom: 4px;
   }
   .t-item {
-    background: var(--bg-2);
+    background: var(--surface-2);
     padding: 6px 10px;
     border-radius: var(--radius-sm);
     font-size: 13px;

@@ -1356,7 +1356,7 @@
       {:else}
         <div class="fd-members-col">
           {#each memberLackingNutrients as m}
-            <div class="fd-member-card" on:click={() => push('/family')} role="button" tabindex="0" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--bg-2); border-radius: var(--radius-md); margin-bottom: 8px; cursor: pointer;">
+            <div class="fd-member-card" on:click={() => push('/family')} role="button" tabindex="0" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--surface-2); border-radius: var(--radius-md); margin-bottom: 8px; cursor: pointer;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <div class="fd-avatar" style="background: var(--accent-dim); color: var(--accent); flex-shrink: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700;">
                   {m.name[0].toUpperCase()}
@@ -2298,16 +2298,16 @@
     <div class="modal-surface" style="max-width: 400px;" on:click|stopPropagation on:keydown|stopPropagation role="dialog" aria-modal="true" tabindex="-1">
       <header class="modal-header">
         <h3>Share Meal</h3>
-        <button class="icon-btn" on:click={() => showShareMeal = false} disabled={shareMealSaving}><span class="material-symbols-rounded">close</span></button>
+        <button class="icon-btn" aria-label="Close" on:click={() => showShareMeal = false} disabled={shareMealSaving}><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
         <p class="text-2 mb-4" style="font-size: 14px;">Distribute this meal among family members. Adjust portion sizes (e.g. 1 for adults, 0.5 for kids). Use 0 if they didn't eat it.</p>
         <div style="display: flex; flex-direction: column; gap: 12px;">
           {#each shareAllocations as alloc, i}
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--bg-2); border-radius: var(--radius-sm);">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; background: var(--surface-2); border-radius: var(--radius-sm);">
               <span style="font-weight: 500; font-size: 14px;">{alloc.name}</span>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="number" bind:value={alloc.scale} min="0" step="0.1" style="width: 70px; text-align: center; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-1);">
+                <input type="number" aria-label="{alloc.name} portions" bind:value={alloc.scale} min="0" step="0.1" style="width: 70px; text-align: center; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2);">
                 <span class="text-3 text-sm" style="width: 60px;">portions</span>
               </div>
             </div>
@@ -2844,9 +2844,9 @@
   /* Log */
   .wc-log-card { border-left:3px solid var(--accent); }
   .wc-log-row  { display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer; }
-  .wc-log-row:hover { background:var(--bg-2); }
-  .wc-log-edit { cursor:default; background:var(--bg-2); }
-  .wc-log-edit:hover { background:var(--bg-2); }
+  .wc-log-row:hover { background:var(--surface-2); }
+  .wc-log-edit { cursor:default; background:var(--surface-2); }
+  .wc-log-edit:hover { background:var(--surface-2); }
   .wc-edit-input { width:80px; padding:4px 8px; font-size:14px; }
   .wc-log-icon { color:var(--accent); font-size:20px; flex-shrink:0; }
   .wc-log-info { flex:1; display:flex; flex-direction:column; gap:2px; }

@@ -780,7 +780,7 @@
               <span>Calories</span>
               <span>{Math.round(totals.calories || 0)} / {aggTargets.calories} kcal</span>
             </div>
-            <div class="pb-track" style="height:6px; background:var(--bg-3); border-radius:3px; overflow:hidden;">
+            <div class="pb-track" style="height:6px; background:var(--surface-3); border-radius:3px; overflow:hidden;">
               <div class="pb-fill" style="height:100%; background:var(--primary); width:{Math.min(100, ((totals.calories || 0) / aggTargets.calories) * 100)}%;"></div>
             </div>
           </div>
@@ -789,7 +789,7 @@
               <span>Protein</span>
               <span>{Math.round(totals.proteins || 0)} / {aggTargets.proteins} g</span>
             </div>
-            <div class="pb-track" style="height:6px; background:var(--bg-3); border-radius:3px; overflow:hidden;">
+            <div class="pb-track" style="height:6px; background:var(--surface-3); border-radius:3px; overflow:hidden;">
               <div class="pb-fill" style="height:100%; background:var(--macro-protein); width:{Math.min(100, ((totals.proteins || 0) / aggTargets.proteins) * 100)}%;"></div>
             </div>
           </div>
