@@ -1,0 +1,116 @@
+[
+  {
+    "name": "Moong Dal Khichdi (Cooked)",
+    "brand": "Homemade",
+    "category": "Dishes",
+    "notes": "Traditional cooked rice and moong dal khichdi. Comfort food, easy to digest.",
+    "portion": 100,
+    "unit": "g",
+    "nutrition": {
+      "calories": 115,
+      "proteins": 4.2,
+      "carbohydrates": 19.8,
+      "fat": 2.1,
+      "fiber": 2.5,
+      "calcium": 22,
+      "iron": 1.2,
+      "zinc": 0.8,
+      "sodium": 240,
+      "vitamin-c": 1.5,
+      "b1": 0.08,
+      "b2": 0.04,
+      "b3": 0.6,
+      "b9": 35
+    }
+  },
+  {
+    "name": "Ragi Porridge (Cooked)",
+    "brand": "Homemade",
+    "category": "Dishes",
+    "notes": "Finger millet porridge. High calcium champion, excellent for infant solid foods.",
+    "portion": 100,
+    "unit": "g",
+    "nutrition": {
+      "calories": 95,
+      "proteins": 1.8,
+      "carbohydrates": 18.2,
+      "fat": 1.1,
+      "fiber": 2.1,
+      "calcium": 86,
+      "iron": 1.0,
+      "zinc": 0.5,
+      "sodium": 15
+    }
+  },
+  {
+    "name": "Whole Wheat Roti (Cooked)",
+    "brand": "Homemade",
+    "category": "Bread",
+    "notes": "Standard Indian flatbread cooked on tawa without ghee/oil.",
+    "portion": 100,
+    "unit": "g",
+    "nutrition": {
+      "calories": 264,
+      "proteins": 8.5,
+      "carbohydrates": 54.0,
+      "fat": 1.5,
+      "fiber": 8.2,
+      "calcium": 35,
+      "iron": 3.2,
+      "zinc": 2.1,
+      "sodium": 3,
+      "b1": 0.35,
+      "b2": 0.12,
+      "b3": 3.8,
+      "b9": 28
+    }
+  },
+  {
+    "name": "Palak Paneer (Cooked)",
+    "brand": "Homemade",
+    "category": "Dishes",
+    "notes": "Spinach curry with paneer. Rich in calcium, Vitamin A, and protein.",
+    "portion": 100,
+    "unit": "g",
+    "nutrition": {
+      "calories": 142,
+      "proteins": 7.2,
+      "carbohydrates": 3.8,
+      "fat": 11.2,
+      "fiber": 2.2,
+      "calcium": 210,
+      "iron": 1.8,
+      "zinc": 1.1,
+      "sodium": 310,
+      "vitamin-c": 12.0,
+      "vitamin-a": 340,
+      "b9": 65,
+      "b12": 0.35
+    }
+  },
+  {
+    "name": "Sprouted Moong Salad (Raw/Steamed)",
+    "brand": "Homemade",
+    "category": "Salad",
+    "notes": "Sprouted whole green gram. Highly bioavailable vitamins and minerals due to germination.",
+    "portion": 100,
+    "unit": "g",
+    "nutrition": {
+      "calories": 128,
+      "proteins": 8.8,
+      "carbohydrates": 21.0,
+      "fat": 0.6,
+      "fiber": 4.5,
+      "calcium": 38,
+      "iron": 2.4,
+      "zinc": 1.2,
+      "sodium": 12,
+      "vitamin-c": 16.0,
+      "vitamin-a": 12,
+      "b1": 0.18,
+      "b2": 0.15,
+      "b3": 1.2,
+      "b9": 85
+    }
+  }
+]
