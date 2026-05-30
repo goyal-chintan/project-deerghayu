@@ -10,7 +10,7 @@
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NUTRITRACE_DIR="$SCRIPT_DIR/../temp-nutritrace"
+NUTRITRACE_DIR="$SCRIPT_DIR/nutritrace"
 SERVER_DIR="$NUTRITRACE_DIR/server"
 
 echo "🥗 Project Deerghayu — Starting NutriTrace"
