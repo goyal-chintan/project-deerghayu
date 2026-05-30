@@ -345,6 +345,7 @@
       portion,
       unit: food.unit || 'g',
       servings: 1,
+      category: food.category || '',
       nutrition: scaledNutrition, // Already scaled to actual intake
       member_allocations: {}
     };

@@ -97,13 +97,16 @@
       // Sort by worst deficit
       lacking.sort((a, b) => a.pct - b.pct);
 
+      const hasTargets = calTarget != null;
+
       return {
         ...m,
         calPct,
         calTarget,
         calCurrent: Math.round(totals.calories),
         lacking: lacking.slice(0, 3),
-        onTrack: lacking.length === 0
+        onTrack: hasTargets && lacking.length === 0,
+        hasTargets
       };
     });
   }
@@ -216,7 +219,12 @@
 
           <!-- Lacking nutrients or on-track -->
           <div class="member-status">
-            {#if card.onTrack}
+            {#if !card.hasTargets}
+              <span class="chip info">
+                <span class="material-symbols-rounded status-icon">target</span>
+                Set goals
+              </span>
+            {:else if card.onTrack}
               <span class="on-track">
                 <span class="material-symbols-rounded status-icon">check_circle</span>
                 On track
@@ -440,6 +448,17 @@
     font-weight: 600;
     color: var(--warning, #f59e0b);
     background: color-mix(in srgb, var(--warning, #f59e0b) 10%, transparent);
+    padding: 2px 8px;
+    border-radius: var(--radius-full, 999px);
+  }
+  .chip.info {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent, #4ffbb0);
+    background: var(--accent-dim, color-mix(in srgb, var(--accent, #4ffbb0) 10%, transparent));
     padding: 2px 8px;
     border-radius: var(--radius-full, 999px);
   }

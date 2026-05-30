@@ -23,6 +23,13 @@
   import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit, vegetarianMode } from '../stores/settings.js';
   import { isAllowedInVegMode, inferDietType } from '../lib/dietType.js';
   import { mealIcon } from '../lib/mealIcon.js';
+
+  function getDietBadge(food) {
+    const dt = (food.diet_type || 'vegetarian').toLowerCase();
+    if (dt.includes('egg')) return 'egg';
+    if (dt.includes('non')) return 'nonveg';
+    return 'veg';
+  }
   import FoodsBanner from '../components/banners/FoodsBanner.svelte';
 
   // Query string params
@@ -986,6 +993,13 @@
                   <span class="food-name">
                     {#if food.favorite}<span class="material-symbols-rounded fav-mark" title="Favorite">favorite</span>{/if}
                     {food.name}
+                    {#if getDietBadge(food) === 'veg'}
+                      <span class="diet-badge veg" title="Vegetarian">&#127807;</span>
+                    {:else if getDietBadge(food) === 'egg'}
+                      <span class="diet-badge egg" title="Eggetarian">&#129370;</span>
+                    {:else}
+                      <span class="diet-badge nonveg" title="Non-vegetarian">&#127834;</span>
+                    {/if}
                   </span>
                   {#if activeTab === 0}
                     {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
@@ -1763,5 +1777,11 @@
       max-height: 44px;
       line-height: 1.45;
     }
+  }
+  .diet-badge {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-left: 4px;
+    vertical-align: middle;
   }
 </style>

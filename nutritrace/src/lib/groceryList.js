@@ -4,6 +4,23 @@
  */
 
 /**
+ * Infer category from item name for items missing explicit category.
+ * Covers common North Indian vegetarian foods.
+ */
+function inferCategory(name) {
+  const n = (name || '').toLowerCase();
+  if (/paneer|milk|dahi|curd|ghee|butter|cream|cheese|yogurt|yoghurt/.test(n)) return 'Dairy';
+  if (/dal|lentil|chana|rajma|moong|masoor|urad|toor/.test(n)) return 'Pulses & Legumes';
+  if (/rice|roti|chapati|bread|atta|wheat|oats|poha|maida|suji|semolina/.test(n)) return 'Grains & Cereals';
+  if (/palak|spinach|gobi|potato|aloo|onion|tomato|carrot|peas|beans|bhindi|lauki|tinda|methi|capsicum|cabbage|brinjal|baingan/.test(n)) return 'Vegetables';
+  if (/apple|banana|mango|orange|papaya|guava|grapes|pomegranate|kiwi|watermelon/.test(n)) return 'Fruits';
+  if (/oil|tel|coconut oil/.test(n)) return 'Oils & Fats';
+  if (/jeera|haldi|mirch|garam masala|salt|pepper|dhania|coriander|cumin/.test(n)) return 'Spices & Condiments';
+  if (/tea|chai|coffee|juice|lassi/.test(n)) return 'Beverages';
+  return 'Other';
+}
+
+/**
  * Generate a grocery list from meal plan items
  * @param {Array} planItems - All items from meal plans (can span multiple days)
  * @param {Array} meals - Saved meals/recipes (for ingredient breakdown)
@@ -23,7 +40,7 @@ export function generateGroceryList(planItems, meals = []) {
           name: ingredient.name || ingredient.food_name,
           portion: (ingredient.portion || 100) * servingScale,
           unit: ingredient.unit || 'g',
-          category: ingredient.category || 'Other',
+          category: ingredient.category || inferCategory(ingredient.name || ingredient.food_name),
           meal_type: item.meal_type,
           date: item.date,
         });
@@ -34,7 +51,7 @@ export function generateGroceryList(planItems, meals = []) {
         name: item.name,
         portion: (item.portion || 100) * (item.servings || 1),
         unit: item.unit || 'g',
-        category: item.category || 'Other',
+        category: item.category || inferCategory(item.name || item.food_name),
         meal_type: item.meal_type,
         date: item.date,
       });
