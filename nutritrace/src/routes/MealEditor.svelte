@@ -12,7 +12,8 @@
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearMealEditorState } from '../stores/editorState.js';
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
-  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, cropPhotos, visibleNutriments, nutrimentsOrder, catName as _catName, catDisplay as _catDisplay, energyUnit, foodsSort, mealsSort, recipesSort } from '../stores/settings.js';
+  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, cropPhotos, visibleNutriments, nutrimentsOrder, catName as _catName, catDisplay as _catDisplay, energyUnit, foodsSort, mealsSort, recipesSort, vegetarianMode } from '../stores/settings.js';
+  import { combineDietTypes, isAllowedInVegMode } from '../lib/dietType.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
 
   export let params = {};
@@ -254,11 +255,14 @@
     return [...sorted.filter(f => f.favorite), ...sorted.filter(f => !f.favorite)];
   }
   $: _pickerListSorted = _applyPickerSort(_pickerList, _pickerSortMode);
+  $: _pickerListDiet = $vegetarianMode
+    ? _pickerListSorted.filter(isAllowedInVegMode)
+    : _pickerListSorted;
   $: pickerFiltered = pickerSearch
-    ? _pickerListSorted.filter(f =>
+    ? _pickerListDiet.filter(f =>
         (f.name||'').toLowerCase().includes(pickerSearch.toLowerCase()) ||
         (f.brand||'').toLowerCase().includes(pickerSearch.toLowerCase()))
-    : _pickerListSorted;
+    : _pickerListDiet;
 
   $: { pickerTab; selectedIngredients = new Set(); }
 
@@ -479,6 +483,7 @@
         imgUrl: photoPreviewUrl || '',
         nutrition: totals,
         is_recipe: isRecipe,
+        diet_type: combineDietTypes(meal.items),
       };
       if (isRecipe) {
         const totalGrams = parseFloat(recipeAmount) || Math.round(meal.items.reduce((s,it)=>s+toGrams(it.portion,it.unit),0)) || 100;

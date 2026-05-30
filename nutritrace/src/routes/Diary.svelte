@@ -24,7 +24,8 @@
     prevDay, nextDay, loadEntry, removeDiaryItem, updateDiaryItem, saveBodyStats,
     copyMealItems, moveMealItems, clearMealItems, copyMealToDate, saveDiaryNote, shareMeal,
     splitRecipeItem, removeSplitChild, updateSplitChild,
-    diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError
+    diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError,
+    addDiaryItem
   } from '../stores/diary.js';
   import { mealNames, goals, energyUnit, weightUnit, lengthUnit, navStyle,
            diaryShowBrands, diaryShowThumbnails,
@@ -35,8 +36,8 @@
            dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners, bannerStyle,
            calorieGoalMode, calorieGoalFactor,
            diaryShowActivity, manualActivityPolicy, calorieAdjustFromActivity,
-           fastingEnabled,
-           wellnessEnabled } from '../stores/settings.js';
+            fastingEnabled,
+            wellnessEnabled, vegetarianMode } from '../stores/settings.js';
   import { dayActivity, activitySummary, loadActivity, deleteActivity } from '../stores/activity.js';
   import DiaryBanner  from '../components/banners/DiaryBanner.svelte';
   import WaterBanner  from '../components/banners/WaterBanner.svelte';
@@ -46,6 +47,7 @@
   import { portal } from '../lib/portal.js';
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
   import { readBodyStat, tagBodyStats, LENGTH_KEYS } from '../lib/body-stats-unit.js';
+  import { suggestFoodsForNutrient } from '../lib/nutrientRecommendations.js';
 
   let addMealIdx = 0;
   let showAddAction = false;
@@ -1114,6 +1116,56 @@
     return Math.round(calGoal * raw / 100 / density);
   }
 
+  // ── Gap Suggestions (food library for recommendations) ──────────────────
+  let _sugFoods = [];
+  let _sugFoodsLoaded = false;
+  let _sugExpanded = false;
+
+  async function _loadSugFoods() {
+    if (_sugFoodsLoaded) return;
+    try {
+      _sugFoods = await NtApi.getFoods();
+      _sugFoodsLoaded = true;
+    } catch (err) { console.error('Failed to load food library for suggestions:', err); }
+  }
+
+  $: if (lackingNutrients.length > 0 && !_sugFoodsLoaded) _loadSugFoods();
+
+  $: _diarySuggestions = (() => {
+    if (!_sugFoodsLoaded || lackingNutrients.length === 0) return [];
+    // Build targets map from goals + familyTargets
+    const results = [];
+    for (const lack of lackingNutrients.slice(0, 5)) {
+      const n = NUTRIMENTS.find(nm => nm.label === lack.label);
+      if (!n) continue;
+      const tgt = getNutrientTarget(n.id);
+      const cur = totals[n.id] || 0;
+      const gap = tgt ? tgt - cur : 0;
+      if (gap <= 0) continue;
+      const suggestions = suggestFoodsForNutrient(n.id, gap, _sugFoods, $vegetarianMode, 3);
+      if (suggestions.length > 0) {
+        results.push({ nutrientId: n.id, label: n.label, unit: n.unit, gap: Math.round(gap * 10) / 10, suggestions });
+      }
+    }
+    return results;
+  })();
+
+  async function addSuggestionToDiary(suggestion) {
+    const food = suggestion.food;
+    const portion = suggestion.servingToFill || 100;
+    // Build item in the same shape openAddFood/pick creates
+    const nutrition = typeof food.nutrition === 'string' ? JSON.parse(food.nutrition) : (food.nutrition || {});
+    const item = {
+      ...food,
+      portion,
+      unit: food.unit || 'g',
+      quantity: 1,
+      nutrition,
+    };
+    await addDiaryItem(item, 0); // Add to first meal slot
+    showSuccess(`Added ${food.name} to diary`);
+  }
+
   // Whether this mount is a genuine first load (no cached entry yet) or a
   // re-mount triggered by App.svelte's {#key $location}. The fly-in
   // transitions on meal sections and diary items only fire when this is
@@ -1668,6 +1720,32 @@
               </p>
             </div>
           </div>
+          {#if _diarySuggestions.length > 0}
+            <div class="diary-suggestions-panel" style="margin-bottom: 16px;">
+              <button class="diary-sug-toggle" on:click={() => _sugExpanded = !_sugExpanded}>
+                <span style="display:flex;align-items:center;gap:6px">
+                  <span style="font-size:14px">💡</span>
+                  <span style="font-weight:600;font-size:12px;color:var(--text-1)">Suggested additions</span>
+                </span>
+                <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3);transition:transform 0.2s;{_sugExpanded ? 'transform:rotate(180deg)' : ''}">expand_more</span>
+              </button>
+              {#if _sugExpanded}
+                <div class="diary-sug-body" transition:slide={{ duration: 150 }}>
+                  {#each _diarySuggestions as group}
+                    <div class="diary-sug-group">
+                      <span class="diary-sug-label">{group.label} (need {group.gap}{group.unit} more)</span>
+                      {#each group.suggestions as s}
+                        <div class="diary-sug-item">
+                          <span class="diary-sug-text">{s.name} ({s.servingToFill}g)</span>
+                          <button class="diary-sug-add" on:click={() => addSuggestionToDiary(s)}>+ Add</button>
+                        </div>
+                      {/each}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
         {:else if familyTargets}
           <div style="background: rgba(79,255,176,0.1); border: 1px solid rgba(79,255,176,0.2); padding: 12px; border-radius: var(--radius-md); margin-bottom: 16px; display: flex; align-items: start; gap: 8px;">
             <span class="material-symbols-rounded" style="color: var(--accent); font-size: 20px; flex-shrink: 0; line-height: 1;">check_circle</span>
@@ -2392,6 +2470,32 @@
               </p>
             </div>
           </div>
+          {#if _diarySuggestions.length > 0}
+            <div class="diary-suggestions-panel" style="margin-bottom: 16px;">
+              <button class="diary-sug-toggle" on:click={() => _sugExpanded = !_sugExpanded}>
+                <span style="display:flex;align-items:center;gap:6px">
+                  <span style="font-size:14px">💡</span>
+                  <span style="font-weight:600;font-size:12px;color:var(--text-1)">Suggested additions</span>
+                </span>
+                <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3);transition:transform 0.2s;{_sugExpanded ? 'transform:rotate(180deg)' : ''}">expand_more</span>
+              </button>
+              {#if _sugExpanded}
+                <div class="diary-sug-body" transition:slide={{ duration: 150 }}>
+                  {#each _diarySuggestions as group}
+                    <div class="diary-sug-group">
+                      <span class="diary-sug-label">{group.label} (need {group.gap}{group.unit} more)</span>
+                      {#each group.suggestions as s}
+                        <div class="diary-sug-item">
+                          <span class="diary-sug-text">{s.name} ({s.servingToFill}g)</span>
+                          <button class="diary-sug-add" on:click={() => addSuggestionToDiary(s)}>+ Add</button>
+                        </div>
+                      {/each}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
         {:else if familyTargets}
           <div style="background: rgba(79,255,176,0.1); border: 1px solid rgba(79,255,176,0.2); padding: 12px; border-radius: var(--radius-md); margin-bottom: 16px; display: flex; align-items: start; gap: 8px;">
             <span class="material-symbols-rounded" style="color: var(--accent); font-size: 20px; flex-shrink: 0; line-height: 1;">check_circle</span>
@@ -3369,4 +3473,41 @@
     color: var(--text-3);
     line-height: 1.1;
   }
+
+  /* ─── Diary Nutrient Gap Suggestions ─────────────────────────── */
+  .diary-suggestions-panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    overflow: hidden;
+  }
+  .diary-sug-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 10px 12px;
+    background: none; border: none; cursor: pointer;
+  }
+  .diary-sug-body {
+    padding: 0 12px 10px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .diary-sug-group { display: flex; flex-direction: column; gap: 4px; }
+  .diary-sug-label {
+    font-size: 10px; font-weight: 600; color: var(--text-2);
+    text-transform: uppercase; letter-spacing: 0.02em;
+  }
+  .diary-sug-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 8px; border-radius: var(--radius-md);
+    background: var(--surface-2);
+  }
+  .diary-sug-text { font-size: 11px; color: var(--text-1); }
+  .diary-sug-add {
+    font-size: 10px; font-weight: 600; padding: 2px 7px;
+    border-radius: var(--radius-full); border: 1px solid var(--accent);
+    background: rgba(79, 255, 176, 0.1); color: var(--accent);
+    cursor: pointer; white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .diary-sug-add:active { transform: scale(0.95); background: rgba(79, 255, 176, 0.2); }
 </style>

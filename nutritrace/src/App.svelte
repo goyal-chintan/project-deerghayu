@@ -47,9 +47,13 @@
 
   import Family     from './routes/Family.svelte';
   import MealPlanner from './routes/MealPlanner.svelte';
+  import Dashboard  from './routes/Dashboard.svelte';
+  import NutrientExplorer from './routes/NutrientExplorer.svelte';
+  import GroceryList from './routes/GroceryList.svelte';
 
   const routes = {
     '/':                Diary,
+    '/dashboard':       Dashboard,
     '/foods':           Foods,
     '/foods/edit':      FoodEditor,
     '/foods/edit/:id':  FoodEditor,
@@ -60,6 +64,8 @@
     '/goals':           Goals,
     '/family':          Family,
     '/planner':         MealPlanner,
+    '/grocery':         GroceryList,
+    '/nutrients':       NutrientExplorer,
     '/settings':        Settings,
     '/wizard':          Wizard,
     '/profile':           Profile,
@@ -500,7 +506,7 @@
   </div>
 {/key}
 
-{#if showNav && ($navStyle === 'bottom' || $navStyle === 'both')}
+{#if showNav && !sidebarPinned && ($navStyle === 'bottom' || $navStyle === 'both')}
   <BottomNav />
 {/if}
 

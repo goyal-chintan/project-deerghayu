@@ -73,44 +73,119 @@ function calculateTargets(member) {
   let carbohydrates = Math.round((calories - (proteins * 4) - (fat * 9)) / 4);
   if (carbohydrates < 50) carbohydrates = 50; // Safety floor
 
-  // Micronutrients base values (scientific RDA levels)
+  // Micronutrients base values (ICMR-NIN 2024 RDA levels)
   let calcium = 1000;
   let iron = 8;
   let vitamin_a = 900;
   let vitamin_c = 90;
   let vitamin_d = 15;
+  let zinc = 12;
+  let fiber = 38;
+  let b9 = 400;
+  let b12 = 2.2;
+  let magnesium = 350;
+  let potassium = 3500;
 
-  if (age < 2) {
+  const isFemale = (gender === 'female' || gender === 'f');
+
+  if (age < 1) {
     calcium = 500;
     iron = 7;
     vitamin_a = 400;
     vitamin_c = 40;
     vitamin_d = 10;
-  } else if (age >= 2 && age <= 8) {
+    zinc = 2.8;
+    fiber = 0;       // No fiber recommendation for infants
+    b9 = 80;
+    b12 = 0.5;
+    magnesium = 40;
+    potassium = 700;
+  } else if (age >= 1 && age <= 3) {
     calcium = 800;
     iron = 10;
     vitamin_a = 400;
     vitamin_c = 45;
     vitamin_d = 15;
-  } else if (age >= 9 && age <= 13) {
+    zinc = 3.3;
+    fiber = 15;
+    b9 = 150;
+    b12 = 0.9;
+    magnesium = 65;
+    potassium = 2000;
+  } else if (age >= 4 && age <= 6) {
+    calcium = 800;
+    iron = 10;
+    vitamin_a = 400;
+    vitamin_c = 45;
+    vitamin_d = 15;
+    zinc = 5.6;
+    fiber = 20;
+    b9 = 200;
+    b12 = 1.2;
+    magnesium = 110;
+    potassium = 2300;
+  } else if (age >= 7 && age <= 8) {
+    calcium = 800;
+    iron = 10;
+    vitamin_a = 400;
+    vitamin_c = 45;
+    vitamin_d = 15;
+    zinc = 7.0;
+    fiber = 20;
+    b9 = 200;
+    b12 = 1.2;
+    magnesium = 110;
+    potassium = 2300;
+  } else if (age >= 9 && age <= 12) {
     calcium = 1300;
     iron = 8;
     vitamin_a = 600;
     vitamin_c = 45;
     vitamin_d = 15;
-  } else if (age >= 14 && age <= 18) {
+    zinc = 8.4;
+    fiber = 26;
+    b9 = 300;
+    b12 = 1.8;
+    magnesium = 200;
+    potassium = 2500;
+  } else if (age >= 13 && age <= 15) {
     calcium = 1300;
-    iron = (gender === 'female' || gender === 'f') ? 15 : 11;
-    vitamin_a = (gender === 'female' || gender === 'f') ? 700 : 900;
-    vitamin_c = (gender === 'female' || gender === 'f') ? 65 : 75;
+    iron = isFemale ? 15 : 11;
+    vitamin_a = isFemale ? 700 : 900;
+    vitamin_c = isFemale ? 65 : 75;
     vitamin_d = 15;
+    zinc = isFemale ? 9.8 : 11.2;
+    // Fiber: age 13 is in 9-13 bracket (26g both), age 14-15 is in 14-18 bracket (M:38, F:26)
+    fiber = age <= 13 ? 26 : (isFemale ? 26 : 38);
+    b9 = 400;
+    b12 = 2.2;
+    magnesium = isFemale ? 300 : 340;
+    potassium = 3500;
+  } else if (age >= 16 && age <= 17) {
+    calcium = 1300;
+    iron = isFemale ? 15 : 11;
+    vitamin_a = isFemale ? 700 : 900;
+    vitamin_c = isFemale ? 65 : 75;
+    vitamin_d = 15;
+    zinc = isFemale ? 9.8 : 12.5;
+    fiber = isFemale ? 26 : 38;
+    b9 = 400;
+    b12 = 2.2;
+    magnesium = isFemale ? 300 : 340;
+    potassium = 3500;
   } else {
-    // Adults >= 19
+    // Adults >= 18
     calcium = 1000;
-    iron = (gender === 'female' || gender === 'f') ? 18 : 8;
-    vitamin_a = (gender === 'female' || gender === 'f') ? 700 : 900;
-    vitamin_c = (gender === 'female' || gender === 'f') ? 75 : 90;
+    iron = isFemale ? 18 : 8;
+    vitamin_a = isFemale ? 700 : 900;
+    vitamin_c = isFemale ? 75 : 90;
     vitamin_d = 15;
+    zinc = isFemale ? 10.0 : 12.0;
+    fiber = isFemale ? 25 : 38;
+    b9 = 400;
+    b12 = 2.2;
+    magnesium = isFemale ? 310 : 350;
+    potassium = 3500;
   }
 
   // Life Stage Adjustments
@@ -120,12 +195,24 @@ function calculateTargets(member) {
     vitamin_a = 770;
     vitamin_c = 85;
     vitamin_d = 15;
+    zinc = 12.0;
+    fiber = 28;
+    b9 = 600;
+    b12 = 2.6;
+    magnesium = age <= 18 ? 335 : 350;
+    potassium = 4000;
   } else if (goal_type === 'lactation') {
     calcium = 1200;
     iron = 9;
     vitamin_a = 1300; // Significantly higher Vitamin A
     vitamin_c = 120;
     vitamin_d = 15;
+    zinc = 12.0;
+    fiber = 29;
+    b9 = 500;
+    b12 = 2.8;
+    magnesium = age <= 18 ? 300 : 310;
+    potassium = 4000;
   }
 
   return {
@@ -133,11 +220,17 @@ function calculateTargets(member) {
     proteins,
     carbohydrates,
     fat,
+    fiber,
     calcium,
     iron,
+    zinc,
+    magnesium,
+    potassium,
     'vitamin-a': vitamin_a,
     'vitamin-c': vitamin_c,
-    'vitamin-d': vitamin_d
+    'vitamin-d': vitamin_d,
+    b9,
+    b12
   };
 }
 

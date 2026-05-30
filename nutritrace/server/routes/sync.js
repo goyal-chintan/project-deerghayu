@@ -143,9 +143,10 @@ router.post('/push', wrap((req, res) => {
             db.prepare(`UPDATE foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(f.server_id);
           } else {
             db.prepare(
-              `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), updated_at=datetime('now') WHERE id=?`
+              `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, diet_type=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), updated_at=datetime('now') WHERE id=?`
             ).run(f.name, f.brand, JSON.stringify(f.nutrition || {}), f.portion ?? 100, f.unit || 'g',
               f.img_url || null, f.notes || null, f.category || null, f.barcode || null,
+              f.diet_type || 'vegetarian',
               f.favorite ? 1 : 0, f.usage_count || 0, f.last_used_at || null, f.server_id);
           }
         }
@@ -153,10 +154,11 @@ router.post('/push', wrap((req, res) => {
       } else if (!f.deleted_at) {
         // New record (no server_id, OR server_id refs missing row → re-create)
         const r = db.prepare(
-          `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, favorite, usage_count, last_used_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+          `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, diet_type, favorite, usage_count, last_used_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
         ).run(u, f.name, f.brand || null, JSON.stringify(f.nutrition || {}), f.portion ?? 100, f.unit || 'g',
           f.img_url || null, f.notes || null, f.category || null, f.barcode || null,
+          f.diet_type || 'vegetarian',
           f.favorite ? 1 : 0, f.usage_count || 0, f.last_used_at || null);
         result.foods.push({ client_id: f.client_id, server_id: r.lastInsertRowid });
       }
@@ -173,21 +175,23 @@ router.post('/push', wrap((req, res) => {
             db.prepare(`UPDATE meals SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(m.server_id);
           } else {
             db.prepare(
-              `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), updated_at=datetime('now') WHERE id=?`
+              `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, diet_type=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), updated_at=datetime('now') WHERE id=?`
             ).run(m.name, JSON.stringify(m.nutrition || {}), JSON.stringify(m.items || []),
               m.img_url || null, m.notes || null, m.is_recipe ? 1 : 0, m.portion ?? 100, m.unit || 'g',
               m.servings != null ? Math.max(1, parseInt(m.servings) || 1) : null,
+              m.diet_type || 'vegetarian',
               m.favorite ? 1 : 0, m.usage_count || 0, m.last_used_at || null, m.server_id);
           }
         }
         result.meals.push({ client_id: m.client_id, server_id: m.server_id });
       } else if (!m.deleted_at) {
         const r = db.prepare(
-          `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, favorite, usage_count, last_used_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+          `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, diet_type, favorite, usage_count, last_used_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
         ).run(u, m.name, JSON.stringify(m.nutrition || {}), JSON.stringify(m.items || []),
           m.img_url || null, m.notes || null, m.is_recipe ? 1 : 0, m.portion ?? 100, m.unit || 'g',
           Math.max(1, parseInt(m.servings) || 1),
+          m.diet_type || 'vegetarian',
           m.favorite ? 1 : 0, m.usage_count || 0, m.last_used_at || null);
         result.meals.push({ client_id: m.client_id, server_id: r.lastInsertRowid });
       }

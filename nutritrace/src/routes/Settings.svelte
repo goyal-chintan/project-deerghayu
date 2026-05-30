@@ -43,6 +43,7 @@
     fitbitEnabled, garminEnabled, healthConnectEnabled,
     fastingEnabled, fastingDefaultHours, fastingNotifyOnGoal,
     fastingScheduleEnabled, fastingScheduleTime, fastingScheduleDays, fastingScheduleGoal,
+    vegetarianMode,
   } from '../stores/settings.js';
   $: _hasWearable = $fitbitEnabled || $garminEnabled || $healthConnectEnabled;
   import { mealIcon } from '../lib/mealIcon.js';
@@ -70,7 +71,7 @@
 
   // ── Collapsible section state ──────────────────────────────────────────────
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
-  let openSections = { serverConnection: false, appearance: false, regional: false, diary: false, foods: false, water: false,
+  let openSections = { serverConnection: false, appearance: false, regional: false, diary: false, dietaryPreferences: false, foods: false, water: false,
                        categories: false, customUnits: false, nutrients: false, goals: false, bodyStats: false, statistics: false,
                        connectedServices: false, ai: false, notifications: false, wellness: false, sharing: false,
                        authentication: false, apiTokens: false, backup: false, importExport: false, email: false, users: false, helpImprove: false, about: false };
@@ -309,6 +310,7 @@
     appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner'],
     regional:          ['regional','language','translation','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','temperature','imperial','metric'],
     diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals','activity','activity section','exercise','fasting','fast','intermittent fasting','if','16:8','omad','time restricted'],
+    dietaryPreferences:['dietary','diet','vegetarian','vegan','non-vegetarian','non vegetarian','eggetarian','veg mode','plant based'],
     foods:             ['foods','thumbnails','category','notes','yesterday meals','sort order','sort','barcode','scan','beep','flashlight','crop photos'],
     water:             ['water','display unit','daily goal','containers','bottle','cup','glass'],
     categories:        ['categories','food categories','tags','labels'],
@@ -2093,6 +2095,23 @@
               </select>
               <button class="btn btn-primary" style="height:42px;white-space:nowrap" on:click={addContainer}>Add</button>
             </div>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- ── Dietary Preferences ──────────────────────────────────────────────── -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'dietaryPreferences')} on:click={() => toggleSection('dietaryPreferences')}>
+      <span class="material-symbols-rounded si">eco</span>
+      <span>Dietary Preferences</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.dietaryPreferences}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'dietaryPreferences') && sectionVisible(settingsQuery, 'dietaryPreferences')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <div class="card settings-card">
+          <div class="setting-row">
+            <div><span class="setting-label">Vegetarian Mode</span><div class="setting-desc">Hide all non-vegetarian foods and meals from the picker and search results</div></div>
+            <Toggle checked={$vegetarianMode} on:change={e => vegetarianMode.set(e.detail)} />
           </div>
         </div>
       </div>

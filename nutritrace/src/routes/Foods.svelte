@@ -20,7 +20,8 @@
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
   import { resolveAssetUrl } from '../lib/platform.js';
-  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
+  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit, vegetarianMode } from '../stores/settings.js';
+  import { isAllowedInVegMode, inferDietType } from '../lib/dietType.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import FoodsBanner from '../components/banners/FoodsBanner.svelte';
 
@@ -230,9 +231,12 @@
     );
   }
 
-  $: filteredBySearch = search
-    ? displayList.filter(f => _fuzzyMatch(f, search))
+  $: filteredByDiet = $vegetarianMode
+    ? displayList.filter(isAllowedInVegMode)
     : displayList;
+  $: filteredBySearch = search
+    ? filteredByDiet.filter(f => _fuzzyMatch(f, search))
+    : filteredByDiet;
   $: filteredList = activeCategoryFilter
     ? filteredBySearch.filter(f => (f.categories||[]).includes(activeCategoryFilter))
     : filteredBySearch;
@@ -321,6 +325,7 @@
       const full = await Mealie.getRecipe(summary.slug);
       if (!full) { showError('Could not load recipe from Mealie'); return; }
       const mapped = Mealie.mapRecipe(full);
+      if (!mapped.diet_type) mapped.diet_type = inferDietType(mapped.name, full.recipeCategory?.map(c => c.name));
       openEditor(mapped, 'foodList');
     } catch(e) {
       showError('Failed to import from Mealie');
@@ -328,6 +333,13 @@
   }
 
   $: { search; searchSource; onSearch(); }
+
+  // Always tag external results with diet_type so it persists when saved,
+  // regardless of whether vegetarian mode is active. Filter only in veg mode.
+  $: _taggedApiResults = apiResults.map(f => f.diet_type ? f : { ...f, diet_type: inferDietType(f.name, f.categories) });
+  $: visibleApiResults = $vegetarianMode ? _taggedApiResults.filter(isAllowedInVegMode) : _taggedApiResults;
+  $: _taggedMealieResults = mealieResults.map(f => f.diet_type ? f : { ...f, diet_type: inferDietType(f.name, f.recipeCategory?.map(c => c.name)) });
+  $: visibleMealieResults = $vegetarianMode ? _taggedMealieResults.filter(isAllowedInVegMode) : _taggedMealieResults;
 
   function _saveScrollState() {
     editorState.foodsScrollY   = window.scrollY;
@@ -554,7 +566,8 @@
         copyAndUse(selectedItem).then(() => { showSuccess('Saved to your catalog'); load(); });
       } else {
         // External item (OFF/USDA) — create a new local food from it
-        NtApi.createFood(selectedItem).then(() => { showSuccess('Saved to My Foods'); load(); })
+        const toSave = selectedItem.diet_type ? selectedItem : { ...selectedItem, diet_type: inferDietType(selectedItem.name, selectedItem.categories || []) };
+        NtApi.createFood(toSave).then(() => { showSuccess('Saved to My Foods'); load(); })
           .catch(e => showError('Could not save: ' + e.message));
       }
     } else if (detail.value === 'delete') {
@@ -640,6 +653,7 @@
       const { API } = await import('../lib/api.js');
       const result = await API.lookupBarcode(code);
       if (result) {
+        if (!result.diet_type) result.diet_type = inferDietType(result.name, result.categories);
         openEditor(result, 'foodList');
       } else {
         const { showInfo: si } = await import('../stores/toast.js');
@@ -819,6 +833,15 @@
         <span class="material-symbols-rounded">barcode_scanner</span>
       </button>
     </div>
+    <button
+      class="veg-toggle"
+      class:active={$vegetarianMode}
+      on:click={() => vegetarianMode.set(!$vegetarianMode)}
+      aria-pressed={$vegetarianMode}
+      title={$vegetarianMode ? 'Vegetarian mode ON' : 'Vegetarian mode OFF'}
+    >
+      <span class="material-symbols-rounded">eco</span>
+    </button>
   </div>
 
   <!-- Source chips: Foods tab gets the full list (Local + OFF/USDA/Mealie/Shared
@@ -832,6 +855,12 @@
           {src.label}
         </button>
       {/each}
+    </div>
+  {/if}
+  {#if $vegetarianMode}
+    <div class="veg-mode-pill" transition:fade>
+      <span class="material-symbols-rounded" style="font-size: 14px">eco</span>
+      Vegetarian mode
     </div>
   {/if}
   </div>
@@ -1003,11 +1032,17 @@
           <p>{$_('foods.no_results_in', { values: { source: _sourceLabel } })}</p>
         </div>
 
+      {:else if $vegetarianMode && visibleApiResults.length === 0 && visibleMealieResults.length === 0}
+        <div class="empty-state">
+          <span class="material-symbols-rounded empty-icon">block</span>
+          <p>No vegetarian results found in {_sourceLabel}</p>
+        </div>
+
       {:else}
         <!-- OFF / USDA results -->
-        {#if apiResults.length > 0}
+        {#if visibleApiResults.length > 0}
           <ul class="food-list">
-            {#each apiResults as food (food.id || food.barcode)}
+            {#each visibleApiResults as food (food.id || food.barcode)}
               {@const _sel = selectedFoods.has(food)}
               {@const _foodEnergy = Nutrition.displayEnergy(food.nutrition?.calories || food.calories || 0, $energyUnit)}
               <li class="food-item card" class:food-selected={_sel}>
@@ -1040,9 +1075,9 @@
         {/if}
 
         <!-- Mealie results -->
-        {#if mealieResults.length > 0}
+        {#if visibleMealieResults.length > 0}
           <ul class="food-list">
-            {#each mealieResults as recipe (recipe.slug)}
+            {#each visibleMealieResults as recipe (recipe.slug)}
               <li class="food-item card">
                 <button class="food-item-btn" on:click={() => pickMealieRecipe(recipe)}>
                   {#if recipe.id}
@@ -1423,6 +1458,38 @@
     align-items: center;
   }
   .scan-btn-inline .material-symbols-rounded { font-size: 20px; }
+
+  .veg-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary, var(--text-3));
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+  .veg-toggle.active {
+    background: var(--diet-veg-dim);
+    color: var(--diet-veg);
+  }
+  .veg-mode-pill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    margin: 0 var(--page-px) 8px;
+    background: var(--diet-veg-dim);
+    color: var(--diet-veg);
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 500;
+    width: fit-content;
+  }
 
   .food-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
   .food-item { overflow: hidden; }

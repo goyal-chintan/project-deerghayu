@@ -70,6 +70,7 @@ export const USER_PREFS = new Set([
   'notifWeeklySummary','weeklySummaryDay','weeklySummaryTime',
   'notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
   'appriseUrl','appriseTag','gotifyUrl','gotifyToken','ntfyUrl','ntfyTopic','ntfyToken',
+  'vegetarianMode',
   // UI behavior prefs that should match across devices
   'accentColor','startPage','goalCelebrations','pageBanners','bannerStyle','language',
 ]);
@@ -458,6 +459,7 @@ export const manualActivityPolicy   = createSettingStore('manualActivityPolicy',
 export const activityAutoEstimate   = createSettingStore('activityAutoEstimate',     false);
 export const calorieAdjustFromActivity = createSettingStore('calorieAdjustFromActivity', false);
 
+export const vegetarianMode          = createSettingStore('vegetarianMode',         false);
 export const foodsShowCategories    = createSettingStore('foodsShowCategories',    true);
 export const foodsShowLabels        = createSettingStore('foodsShowLabels',        true);
 export const foodsShowNotes         = createSettingStore('foodsShowNotes',         true);

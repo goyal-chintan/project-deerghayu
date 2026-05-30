@@ -227,3 +227,11 @@ const Nutrition = {
 };
 
 export { NUTRIMENTS, Nutrition };
+
+/**
+ * Vegetarian iron bioavailability multiplier.
+ * Plant-based (non-heme) iron has 5-12% absorption vs 15-35% for heme iron.
+ * ICMR recommends 1.8× iron RDA for vegetarians to compensate.
+ * Reference: ICMR-NIN 2024, WHO/FAO
+ */
+export const VEG_IRON_MULTIPLIER = 1.8;

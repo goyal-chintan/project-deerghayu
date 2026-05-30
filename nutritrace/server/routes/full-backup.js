@@ -56,16 +56,16 @@ function restoreFromZip(zip) {
     // Android delta sync silently skips. Forcing NOW means restored rows
     // become visible to the next pull (#39 followup).
     const insFood = db.prepare(`
-      INSERT OR IGNORE INTO foods (id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, favorite, usage_count, last_used_at, created_at, updated_at, deleted_at)
-      VALUES (@id, @user_id, @name, @brand, @nutrition, @portion, @unit, @img_url, @notes, @category, @barcode, @visibility, @source_id, @favorite, @usage_count, @last_used_at, @created_at, COALESCE(@updated_at, datetime('now')), @deleted_at)
+      INSERT OR IGNORE INTO foods (id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, favorite, usage_count, last_used_at, created_at, updated_at, deleted_at, diet_type)
+      VALUES (@id, @user_id, @name, @brand, @nutrition, @portion, @unit, @img_url, @notes, @category, @barcode, @visibility, @source_id, @favorite, @usage_count, @last_used_at, @created_at, COALESCE(@updated_at, datetime('now')), @deleted_at, @diet_type)
     `);
-    for (const f of data.foods || []) insFood.run({ visibility: 'private', source_id: null, favorite: 0, usage_count: 0, last_used_at: null, updated_at: null, deleted_at: null, ...f });
+    for (const f of data.foods || []) insFood.run({ visibility: 'private', source_id: null, favorite: 0, usage_count: 0, last_used_at: null, updated_at: null, deleted_at: null, diet_type: 'vegetarian', ...f });
 
     const insMeal = db.prepare(`
-      INSERT OR IGNORE INTO meals (id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, source_id, favorite, usage_count, last_used_at, created_at, updated_at, deleted_at)
-      VALUES (@id, @user_id, @name, @nutrition, @items, @img_url, @notes, @is_recipe, @portion, @unit, @servings, @visibility, @source_id, @favorite, @usage_count, @last_used_at, @created_at, COALESCE(@updated_at, datetime('now')), @deleted_at)
+      INSERT OR IGNORE INTO meals (id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, source_id, favorite, usage_count, last_used_at, created_at, updated_at, deleted_at, diet_type)
+      VALUES (@id, @user_id, @name, @nutrition, @items, @img_url, @notes, @is_recipe, @portion, @unit, @servings, @visibility, @source_id, @favorite, @usage_count, @last_used_at, @created_at, COALESCE(@updated_at, datetime('now')), @deleted_at, @diet_type)
     `);
-    for (const m of data.meals || []) insMeal.run({ visibility: 'private', source_id: null, favorite: 0, usage_count: 0, last_used_at: null, updated_at: null, deleted_at: null, servings: null, ...m });
+    for (const m of data.meals || []) insMeal.run({ visibility: 'private', source_id: null, favorite: 0, usage_count: 0, last_used_at: null, updated_at: null, deleted_at: null, servings: null, diet_type: 'vegetarian', ...m });
 
     const insFoodShare = db.prepare(`INSERT OR IGNORE INTO food_shares (food_id, user_id) VALUES (@food_id, @user_id)`);
     for (const fs of data.food_shares || []) insFoodShare.run(fs);

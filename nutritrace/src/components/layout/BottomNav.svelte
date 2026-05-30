@@ -1,29 +1,24 @@
 <script>
   import { location, push } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
-  import { wellnessEnabled, fitbitEnabled, withingsEnabled, garminEnabled, healthConnectEnabled } from '../../stores/settings.js';
-  import WellnessIcon from '../icons/WellnessIcon.svelte';
 
-  $: BASE_TABS = [
-    { path: '/',            icon: 'book',          label: $_('nav.diary')      },
-    { path: '/foods',       icon: 'restaurant',    label: $_('nav.foods')      },
-    { path: '/statistics',  icon: 'bar_chart',     label: $_('nav.statistics') },
-    { path: '/goals',       icon: 'flag',          label: $_('nav.goals')      },
-    { path: '/settings',    icon: 'settings',      label: $_('nav.settings')   },
+  $: tabs = [
+    { path: '/dashboard',   icon: 'home',           label: 'Home'    },
+    { path: '/',            icon: 'edit_note',      label: $_('nav.diary')  },
+    { path: '/foods',       icon: 'restaurant',     label: $_('nav.foods')  },
+    { path: '/planner',     icon: 'calendar_month', label: 'Planner' },
+    { path: '/settings',    icon: 'menu',           label: 'More'    },
   ];
-
-  $: WELLNESS_TAB = { path: '/wellness', customIcon: WellnessIcon, label: $_('nav.wellness') };
-
-  // Wellness tab inserted after Foods (where Water used to be) when the feature is enabled
-  $: showWellness = $wellnessEnabled && ($fitbitEnabled || $withingsEnabled || $garminEnabled || $healthConnectEnabled);
-  $: tabs = showWellness
-    ? [...BASE_TABS.slice(0, 2), WELLNESS_TAB, ...BASE_TABS.slice(2)]
-    : BASE_TABS;
 
   $: activeIdx = (() => {
     const base = $location.split('?')[0];
     const idx = tabs.findIndex(t => t.path === base);
-    return idx >= 0 ? idx : 0;
+    if (idx >= 0) return idx;
+    // Routes not surfaced as primary tabs (Nutrients, Grocery, Family,
+    // Statistics, Goals, Profile…) are reachable via the overflow menu, so
+    // reflect that by highlighting the "More" tab instead of falsely
+    // marking "Home" active.
+    return tabs.length - 1;
   })();
 
   function go(path) { push(path); }
@@ -44,11 +39,7 @@
       aria-label={tab.label}
       aria-current={i === activeIdx ? 'page' : undefined}
     >
-      {#if tab.customIcon}
-        <span class="nav-icon custom-icon"><svelte:component this={tab.customIcon} /></span>
-      {:else}
-        <span class="material-symbols-rounded nav-icon">{tab.icon}</span>
-      {/if}
+      <span class="material-symbols-rounded nav-icon">{tab.icon}</span>
       <span class="nav-label">{tab.label}</span>
     </button>
   {/each}
@@ -109,12 +100,6 @@
     transition: transform var(--dur-fast) var(--ease-spring);
   }
   .nav-tab.active .nav-icon { transform: scale(1.1); }
-  /* Custom SVG icon: match material symbols display size */
-  .nav-icon.custom-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
 
   .nav-label {
     font-size: 10px;
