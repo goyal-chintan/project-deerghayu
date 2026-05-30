@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "seed:indb": "node seed/seed-indb.js"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.4.0-r.1",
