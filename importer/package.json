@@ -1,0 +1,10 @@
+{
+  "name": "project-deerghayu-importer",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Imports IFCT 2017 & INDB 2024 cooked dishes into NutriTrace Portable JSON format",
+  "main": "index.js",
+  "dependencies": {
+    "@nodef/ifct2017": "npm:@jsr/nodef__ifct2017@^1.0.12"
+  }
+}
