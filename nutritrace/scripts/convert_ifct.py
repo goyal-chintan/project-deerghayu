@@ -32,6 +32,11 @@ CODE_MAP = {
     # macronutrients (app unit: g)
     "protcnt": ("proteins", G), "fatce": ("fat", G), "fibtg": ("fiber", G),
     "choavldf": ("carbohydrates", G), "fsugar": ("sugars", G),
+    # fatty-acid breakdown (app unit: g; IFCT stores these in grams, factor 1).
+    # saturated-fat is a default-visible Nutrition Facts row, so omitting it
+    # left every IFCT food blank where the app expects a value.
+    "fasat": ("saturated-fat", G), "fams": ("monounsaturated-fat", G),
+    "fapu": ("polyunsaturated-fat", G), "fatrn": ("trans-fat", G),
     # cholesterol (app unit: mg)
     "cholc": ("cholesterol", MG),
     # minerals (app unit: mg)
@@ -95,6 +100,20 @@ def main():
         vk = (num(r.get("vitk1")) or 0) + (num(r.get("vitk2")) or 0)
         if vk > 0:
             nutrition["vitamin-k"] = round(vk * UG, 3)
+        # Fatty-acid consistency guard. IFCT assays individual fatty acids
+        # separately from crude "total fat" (fatce), so for some lean or
+        # trace-fat foods (lean fish plus a few low-fat vegetables/fruits) the
+        # SFA+MUFA+PUFA sum exceeds total fat. Showing a breakdown larger than
+        # its parent is incoherent, so drop the breakdown (keeping the
+        # authoritative total fat) whenever the sum exceeds total fat by more
+        # than the 10% tolerance that already absorbs rounding noise.
+        fat = nutrition.get("fat")
+        fa_sum = sum(nutrition.get(k, 0) for k in
+                     ("saturated-fat", "monounsaturated-fat", "polyunsaturated-fat"))
+        if fat is not None and fa_sum > fat * 1.1:
+            for k in ("saturated-fat", "monounsaturated-fat",
+                      "polyunsaturated-fat", "trans-fat"):
+                nutrition.pop(k, None)
         diet = diet_from_tags(r.get("tags"))
         diet_counts[diet] = diet_counts.get(diet, 0) + 1
         out.append({

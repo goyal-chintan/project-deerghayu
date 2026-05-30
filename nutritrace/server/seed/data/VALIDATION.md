@@ -55,7 +55,7 @@ Stated calories vs 4·carb + 4·protein + 9·fat. Drift is expected from fiber, 
 | carbohydrates | 313 / 542 | 983 / 984 |
 | fiber | 306 / 542 | 933 / 984 |
 | sugars | 314 / 542 | 983 / 984 |
-| saturated-fat | 0 / 542 | 981 / 984 |
+| saturated-fat | 523 / 542 | 981 / 984 |
 | cholesterol | 211 / 542 | 621 / 984 |
 | sodium | 528 / 542 | 982 / 984 |
 | calcium | 527 / 542 | 983 / 984 |
