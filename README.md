@@ -40,7 +40,7 @@ project-deerghayu/
 ./start-nutritrace.sh
 ```
 
-Then open **http://localhost:3001** in your browser.
+Then open **http://localhost:3002** in your browser.
 
 **First time only:** Create your admin account when prompted.
 
@@ -127,7 +127,7 @@ Then re-run the importer: `cd importer && node index.js`
 
 NutriTrace works in any mobile browser. Access from your phone using your Mac's local IP:
 1. Find your Mac IP: `ipconfig getifaddr en0`
-2. Open `http://<your-mac-ip>:3001` on your phone (same WiFi network)
+2. Open `http://<your-mac-ip>:3002` on your phone (same WiFi network)
 
 ---
 
