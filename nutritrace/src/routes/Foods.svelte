@@ -198,8 +198,14 @@
 
   // Convert item portions to grams for total serving display
   const _toG = { g:1, ml:1, oz:28.35, lb:453.59, cup:240, tbsp:15, tsp:5 };
-  function mealServing(items) {
-    if (!items?.length) return '0g';
+  function mealServing(items, portion) {
+    if (!items?.length) {
+      // Recipes seeded from aggregate nutrition (no itemized ingredients)
+      // carry their serving weight in `portion` instead — fall back to it
+      // so the card shows e.g. "208g" rather than a misleading "0g".
+      const p = parseFloat(portion);
+      return p > 0 ? `${Math.round(p)}g` : '0g';
+    }
     const total = items.reduce((s, i) => s + (parseFloat(i.portion)||0) * (_toG[i.unit] ?? 1), 0);
     return `${Math.round(total)}g`;
   }
@@ -1007,7 +1013,7 @@
                   {:else}
                     {@const _kcal = Math.round(Nutrition.sum((food.items||[]).map(i => Nutrition.calculate(i))).calories || food.nutrition?.calories || 0)}
                     {@const _mealEnergy = Nutrition.displayEnergy(_kcal, $energyUnit)}
-                    <span class="food-brand text-3 text-sm">{mealServing(food.items)}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
+                    <span class="food-brand text-3 text-sm">{mealServing(food.items, food.portion)}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
                     <span class="food-kcal text-sm">{_mealEnergy.value.toLocaleString()} {_mealEnergy.unit}</span>
                   {/if}
                 </div>
