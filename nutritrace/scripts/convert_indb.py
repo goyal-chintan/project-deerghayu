@@ -22,6 +22,7 @@ import openpyxl
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "data", "Anuvaad_INDB_2024.11.xlsx")
 OUT = os.path.join(HERE, "..", "server", "seed", "data", "indb-recipes.json")
+QUARANTINE = os.path.join(HERE, "..", "server", "seed", "data", "indb-quarantine.json")
 
 G, MG_TO_G = 1, 0.001  # app stores fat sub-fractions in g; INDB gives them in mg
 
@@ -90,6 +91,25 @@ def num(v):
 SODIUM_MAX_PER_100G = 8000.0  # mg
 _dropped_sodium = []
 
+# Internal-consistency quarantine. A food's stated energy cannot be materially
+# LESS than the metabolizable energy its own macros provide. ~25-31 INDB
+# soup/sauce rows are internally self-contradictory by 4-7x: their energy
+# column reads like a clear soup (~30 kcal/100g) while their protein/fat/
+# mineral columns are inflated ~6x (e.g. Egg drop soup: 27 kcal but 13 g
+# protein + 14 g fat = 178 kcal). Such a row is untrustworthy in EVERY field,
+# so we drop the whole recipe rather than seed partly-corrupt data. We use the
+# fiber-corrected Atwater factors (available carb x4, fiber x2, protein x4,
+# fat x9) so genuinely high-fiber foods are not false-positives.
+ATWATER_MAX_RATIO = 1.5  # drop if macro-energy > 1.5x stated energy
+_quarantined = []
+
+
+def atwater_kcal(nutrition):
+    carb = nutrition.get("carbohydrates", 0)
+    fiber = nutrition.get("fiber", 0)
+    avail = max(carb - fiber, 0)
+    return 4 * avail + 2 * fiber + 4 * nutrition.get("proteins", 0) + 9 * nutrition.get("fat", 0)
+
 
 def main():
     wb = openpyxl.load_workbook(SRC, read_only=True, data_only=True)
@@ -148,6 +168,14 @@ def main():
         if "calories" not in nutrition:
             no_energy += 1
 
+        # Internal-consistency quarantine: drop irrecoverably contradictory rows.
+        kcal = nutrition.get("calories")
+        if kcal and kcal > 0:
+            atw = atwater_kcal(nutrition)
+            if atw > ATWATER_MAX_RATIO * kcal:
+                _quarantined.append((name, round(atw / kcal, 1), round(kcal, 1)))
+                continue
+
         # Drop impossible sodium (source error) — see SODIUM_MAX_PER_100G.
         if "sodium" in nutrition and serving_g:
             per100 = nutrition["sodium"] / serving_g * 100
@@ -172,9 +200,28 @@ def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as fh:
         json.dump(out, fh, ensure_ascii=False, indent=1)
+
+    # Auditable record of everything excluded, so VALIDATION.md and reviewers
+    # can see exactly what was dropped and why.
+    quarantine = {
+        "energy_macro_contradiction": [
+            {"name": n, "atwater_ratio": r, "stated_kcal": k}
+            for n, r, k in sorted(_quarantined, key=lambda x: -x[1])
+        ],
+        "implausible_sodium_dropped": [
+            {"name": n, "mg_per_100g": p}
+            for n, p in sorted(_dropped_sodium, key=lambda x: -x[1])
+        ],
+    }
+    with open(QUARANTINE, "w", encoding="utf-8") as fh:
+        json.dump(quarantine, fh, ensure_ascii=False, indent=1)
     print(f"Wrote {len(out)} recipes -> {OUT}")
     print("Primary source split:", src_counts)
     print(f"Recipes without energy: {no_energy}")
+    print(f"Quarantined (energy/macro contradiction >{ATWATER_MAX_RATIO}x): "
+          f"{len(_quarantined)} recipes")
+    for nm, r, k in sorted(_quarantined, key=lambda x: -x[1])[:5]:
+        print(f"    · {nm[:40]:<42} {r}x (stated {k} kcal)")
     print(f"Dropped implausible sodium (>{SODIUM_MAX_PER_100G:.0f} mg/100g): "
           f"{len(_dropped_sodium)} recipes")
     for nm, p in sorted(_dropped_sodium, key=lambda x: -x[1])[:5]:
