@@ -32,47 +32,57 @@
 
 ---
 
-### Task 1: Conversion script (xlsx → faithful JSON)
+### Task 1a: IFCT 2017 ingredient converter (CSV → JSON)
 
 **Files:**
-- Create: `nutritrace/scripts/convert_indb.py`
-- Output (committed): `nutritrace/server/seed/data/indb-foods.json`, `nutritrace/server/seed/data/indb-recipes.json`
+- Create: `nutritrace/scripts/convert_ifct.py`
+- Output (committed): `nutritrace/server/seed/data/ifct-foods.json`
 
-**Step 1:** Write `convert_indb.py`:
-- Download `https://www.anuvaad.org.in/wp-content/uploads/2020/07/Anuvaad_INDB_2024.11.xlsx` to `scripts/data/` if absent.
-- Read the INDB sheet. Split rows by `primarysource`: recipe sources `['asc_manual','bfp_manual','open_source_recipes']` → recipes; the rest → raw ingredients.
-- Map columns → `nutrition.js` keys (mapping table in the design doc). Vitamin D = `vitd2_ug + vitd3_ug`. Drop values ≤ 0, round to 3 dp.
-- Emit **faithful** records: `{ name, source (brand), food_code, food_group, nutrition, servings?, per_serving? }`. Do NOT classify diet/category here (done in Node).
-- Deterministic ordering (sort by name) so JSON diffs are stable.
+**Step 1:** Write `convert_ifct.py`:
+- Fetch `https://raw.githubusercontent.com/nodef/ifct2017/master/compositions/index.csv` (cache in `scripts/data/`). Also fetch the column-descriptions resource from the repo to map IFCT codes → meaning.
+- Map IFCT codes → `nutrition.js` keys: `enerc`→calories (convert kJ→kcal if needed, verify magnitude), `protcnt`→proteins, `fatce`→fat, `fibtg`→fiber, `choavldf`→carbohydrates, `cholc`→cholesterol, plus minerals (ca/fe/mg/p/k/na/zn) and vitamins (a/c/e/k/b1/b2/b3/b6, folate→b9, vitd). Ignore `_e` (standard-error) columns.
+- Derive `diet_type` from the IFCT `tags` field (`vegetarian`/`eggetarian`/`fishetarian`→non-vegetarian/`non-veg`). Derive `category` from `grup`.
+- Emit faithful records `{ name, scientific, source:"IFCT 2017", code, grup, tags, nutrition }`. Sort by name.
 
-**Step 2:** Run: `python3 nutritrace/scripts/convert_indb.py`
-Expected: prints counts (~1,095 foods, ~1,014 recipes); writes both JSON files.
-
-**Step 3:** Sanity-check output:
-Run: `node -e "const f=require('./nutritrace/server/seed/data/indb-foods.json'); console.log(f.length, Object.keys(f[0]))"`
-Expected: count > 500; keys include `name`, `nutrition`.
-
-**Step 4:** Commit: `feat: add INDB→JSON conversion script and derived datasets`.
+**Step 2:** Run `python3 nutritrace/scripts/convert_ifct.py`; expected ~542 rows.
+**Step 3:** Sanity: `node -e "const f=require('./nutritrace/server/seed/data/ifct-foods.json'); console.log(f.length, f[0])"`.
+**Step 4:** Commit: `feat: add IFCT-2017 ingredient converter + dataset`.
 
 ---
 
-### Task 2: Accuracy validation gate (vs IFCT 2017)
+### Task 1b: INDB recipe converter (xlsx → JSON)
 
 **Files:**
-- Create: `nutritrace/scripts/validate_indb.py`
+- Create: `nutritrace/scripts/convert_indb.py`
+- Output (committed): `nutritrace/server/seed/data/indb-recipes.json`
+- Input (gitignored): `nutritrace/scripts/data/Anuvaad_INDB_2024.11.xlsx` (already downloaded)
+
+**Step 1:** Write `convert_indb.py` for the **single `Sheet1`, 1,014 recipe rows**:
+- Map per-100g columns → `nutrition.js` keys. **Unit conversions:** `sfa_mg/mufa_mg/pufa_mg` ÷1000 → saturated/mono/poly-unsaturated-fat (g); `cholesterol_mg`→cholesterol (mg, no convert); `freesugar_g`→sugars; `folate_ug`→b9 (ignore identical `vitb9_ug`); vitamin-d = `vitd2_ug+vitd3_ug`; skip `vitb5/vitb7/carotenoids` (no app key). Drop ≤0.
+- Capture `servings_unit` + `unit_serving_energy_kcal` for portion metadata.
+- Emit faithful records `{ name, source:"INDB", food_code, nutrition, serving_unit, per_serving:{...} }`. Sort by name.
+
+**Step 2:** Run `python3 nutritrace/scripts/convert_indb.py`; expected 1,014 rows.
+**Step 3:** Sanity-check a known row (Mutton biryani) nutrient magnitudes.
+**Step 4:** Commit: `feat: add INDB recipe converter + dataset`.
+
+---
+
+### Task 2: Accuracy validation gate
+
+**Files:**
+- Create: `nutritrace/scripts/validate_data.py`
 - Output (committed): `nutritrace/server/seed/data/VALIDATION.md`
 
-**Step 1:** Write `validate_indb.py`:
-- Fetch IFCT 2017 compositions JSON from `nodef/ifct2017` raw GitHub (ground truth) → cache in `scripts/data/`.
-- Match a sample of INDB ingredients to IFCT entries by normalized name.
-- For matched pairs, compare `calories/proteins/iron/calcium`; flag deviation > ±10%.
-- Run unit/sanity checks on ALL rows: no negative/NaN, µg vs mg ranges plausible, no duplicate `name|source`.
-- Write `VALIDATION.md`: match count, %-within-tolerance, list of outliers, sanity-check pass/fail.
+**Step 1:** Write `validate_data.py`:
+- Ingredients ARE IFCT 2017 (gold standard) — assert structural integrity (no negative/NaN, unit ranges, no dup `name`).
+- Recipes (INDB): plausibility checks — kcal in 0–900/100g, macros sum sane, no negatives; cross-check a sample of recipes whose main ingredient maps to an IFCT food for order-of-magnitude agreement.
+- Report B12 coverage gap explicitly.
+- Write `VALIDATION.md`: counts, sanity pass/fail, outliers, documented limitations.
 
-**Step 2:** Run: `python3 nutritrace/scripts/validate_indb.py`
-Expected: GATE — ≥80% of matched ingredients within ±10%, 0 sanity-check failures. If gate fails, STOP and report (do not seed).
-
-**Step 3:** Commit: `test: add IFCT-2017 accuracy validation + report for INDB data`.
+**Step 2:** Run `python3 nutritrace/scripts/validate_data.py`
+Expected GATE: 0 sanity failures on both datasets; recipe plausibility ≥95%. If fail, STOP and report.
+**Step 3:** Commit: `test: add accuracy/sanity validation + report`.
 
 ---
 
@@ -124,7 +134,7 @@ test('category from group', () => {
 - running `seedFoods` twice → row count unchanged (idempotent).
 - malformed row (missing name) skipped, not thrown.
 **Step 2:** Run: `node --test` → FAIL.
-**Step 3:** Implement `seed-indb.js`: prepared INSERTs mirroring `routes/foods.js` columns; dedupe by `name|brand` (foods) / `name` (meals); apply `classify.js`; provenance into `notes`; accept `{ db, ownerId }` for testability.
+**Step 3:** Implement `seed-indb.js`: prepared INSERTs mirroring `routes/foods.js` columns; reads both `ifct-foods.json` (→ `foods`, diet_type already set from IFCT tags) and `indb-recipes.json` (→ `meals`, diet_type via `classify.js` keyword pass); dedupe by `name|brand` (foods) / `name` (meals); provenance into `notes`; accept `{ db, ownerId }` for testability.
 **Step 4:** Run: `node --test` → PASS.
 **Step 5:** Commit: `feat: add idempotent INDB seeder`.
 

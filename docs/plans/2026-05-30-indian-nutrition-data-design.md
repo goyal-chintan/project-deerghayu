@@ -15,14 +15,29 @@ into the app.
 
 ## Data sources & provenance
 
+> **Refinement (post-inspection of real files, 2026-05-30):** The canonical Anuvaad INDB
+> download (`Anuvaad_INDB_2024.11.xlsx`) is **recipes-only** (1,014 rows). It contains no raw
+> ingredients. Therefore ingredients are sourced **directly from IFCT 2017** (the authority
+> itself, lab-measured) and recipes from INDB. This is strictly more accurate than the
+> originally-planned "INDB primary" approach.
+
 | Role | Source | Backing | Coverage |
 |------|--------|---------|----------|
-| **Primary** | INDB — Indian Nutrient Databank (`Anuvaad_INDB_2024.11.xlsx`, anuvaad.org.in) | Peer-reviewed: Vijayakumar A, Dubasi HB, Awasthi A, Jaacks LM. *Development of an Indian Food Composition Database.* Current Developments in Nutrition, 2024 (Gold Open Access, American Society for Nutrition). Gates-funded. | 1,095 ingredients + 1,014 pan-Indian recipes (per 100 g & per serving) |
-| **Validation ground-truth** | IFCT 2017 — Indian Food Composition Tables, ICMR–NIN | Lab-measured by the National Institute of Nutrition across 6 regions. Machine-readable: `nodef/ifct2017`, Zenodo 7088653. | 542 ingredients |
+| **Ingredients** | IFCT 2017 — Indian Food Composition Tables, ICMR–NIN (`nodef/ifct2017` extract, Zenodo 7088653) | Lab-measured by the National Institute of Nutrition across 6 regions. Includes per-food diet **tags** (veg/eggetarian/fishetarian/non-veg) and food **groups**. | 542 ingredients |
+| **Recipes** | INDB — Indian Nutrient Databank (`Anuvaad_INDB_2024.11.xlsx`) | Peer-reviewed: Vijayakumar A, Dubasi HB, Awasthi A, Jaacks LM. *Development of an Indian Food Composition Database.* Current Developments in Nutrition, 2024 (Gold Open Access, ASN). Gates-funded. | 1,014 pan-Indian recipes (per 100 g & per serving) |
 
-INDB nutrient values are themselves referenced from: (1) IFCT 2017 (NIN/ICMR), (2) Nutritive
+INDB recipe values are themselves referenced from: (1) IFCT 2017 (NIN/ICMR), (2) Nutritive
 Value of Indian Foods 2004 (NIN/ICMR), (3) UK CoFID (Public Health England), (4) USDA
 FoodData Central. Provenance therefore traces to government/lab authorities.
+
+### Known data facts / limitations (documented, not hidden)
+- **No vitamin B12** in either source's columns. B12 is the key vegetarian-deficiency nutrient;
+  seeded items will simply lack a `b12` value rather than carry a fabricated one. Documented in
+  `VALIDATION.md` and the PR.
+- Unit conversions required: INDB `sfa_mg/mufa_mg/pufa_mg` (mg) → app grams (÷1000); IFCT
+  energy codes → kcal as needed. `folate_ug` == `vitb9_ug` → use one (`b9`).
+- IFCT ingredient diet_type/category come from IFCT tags/groups; INDB recipes have no diet flag,
+  so recipe diet_type is keyword-classified.
 
 ### Licensing posture (accuracy-first, license-flexible — user-approved)
 
