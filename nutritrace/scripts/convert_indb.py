@@ -81,6 +81,16 @@ def num(v):
         return None
 
 
+# Physiological plausibility cap (per 100 g). A handful of INDB soup/sauce rows
+# carry impossible sodium (>8 g/100 g; seawater is ~1.1 g, soy sauce ~6 g) —
+# clearly a source error. We drop ONLY the offending sodium value (keeping each
+# recipe's valid macros) so RDA tracking isn't poisoned. Reported in stdout and
+# picked up by validate_data.py for VALIDATION.md. Kept nutrient-specific and
+# conservative on purpose: every other nutrient passes a per-100g sanity scan.
+SODIUM_MAX_PER_100G = 8000.0  # mg
+_dropped_sodium = []
+
+
 def main():
     wb = openpyxl.load_workbook(SRC, read_only=True, data_only=True)
     ws = wb["Sheet1"]
@@ -138,6 +148,13 @@ def main():
         if "calories" not in nutrition:
             no_energy += 1
 
+        # Drop impossible sodium (source error) — see SODIUM_MAX_PER_100G.
+        if "sodium" in nutrition and serving_g:
+            per100 = nutrition["sodium"] / serving_g * 100
+            if per100 > SODIUM_MAX_PER_100G:
+                _dropped_sodium.append((name, round(per100, 1)))
+                del nutrition["sodium"]
+
         psrc = str(row[idx["primarysource"]] or "").strip()
         src_counts[psrc] = src_counts.get(psrc, 0) + 1
         out.append({
@@ -158,6 +175,10 @@ def main():
     print(f"Wrote {len(out)} recipes -> {OUT}")
     print("Primary source split:", src_counts)
     print(f"Recipes without energy: {no_energy}")
+    print(f"Dropped implausible sodium (>{SODIUM_MAX_PER_100G:.0f} mg/100g): "
+          f"{len(_dropped_sodium)} recipes")
+    for nm, p in sorted(_dropped_sodium, key=lambda x: -x[1])[:5]:
+        print(f"    · {nm[:40]:<42} {p} mg/100g")
     for nm in ("Hot tea", "Plain khitchdi", "Chicken curry", "Palak paneer"):
         m = [o for o in out if nm.lower() in o["name"].lower()]
         if m:
