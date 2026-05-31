@@ -45,40 +45,70 @@ Stated calories vs 4·carb + 4·protein + 9·fat. Drift is expected from fiber, 
 | INDB | Chicken pulao | 723.2 | 970.5 | 34% |
 | INDB | Mutton pulao | 866.5 | 1114.1 | 29% |
 
-## Nutrient coverage
+## Nutrient coverage (resolved provenance)
 
-| Nutrient | IFCT foods | INDB recipes |
-|---|--:|--:|
-| calories | 542 / 542 | 984 / 984 |
-| proteins | 542 / 542 | 984 / 984 |
-| fat | 542 / 542 | 984 / 984 |
-| carbohydrates | 542 / 542 | 984 / 984 |
-| fiber | 542 / 542 | 984 / 984 |
-| sugars | 542 / 542 | 984 / 984 |
-| saturated-fat | 542 / 542 | 984 / 984 |
-| cholesterol | 542 / 542 | 984 / 984 |
-| sodium | 542 / 542 | 984 / 984 |
-| calcium | 542 / 542 | 984 / 984 |
-| iron | 542 / 542 | 984 / 984 |
-| potassium | 542 / 542 | 984 / 984 |
-| magnesium | 542 / 542 | 984 / 984 |
-| zinc | 542 / 542 | 984 / 984 |
-| phosphorus | 542 / 542 | 984 / 984 |
-| vitamin-a | 542 / 542 | 984 / 984 |
-| vitamin-c | 542 / 542 | 984 / 984 |
-| vitamin-d | 542 / 542 | 984 / 984 |
-| vitamin-e | 542 / 542 | 984 / 984 |
-| vitamin-k | 542 / 542 | 984 / 984 |
-| b1 | 542 / 542 | 984 / 984 |
-| b2 | 542 / 542 | 984 / 984 |
-| b3 | 542 / 542 | 984 / 984 |
-| b6 | 542 / 542 | 984 / 984 |
-| b9 | 542 / 542 | 984 / 984 |
-| b12 | 542 / 542 | 984 / 984 |
+Counts entries with `nutrition_meta.status` ≠ `missing` — i.e. sourced, derived, explicit_zero, or estimated. Missing = unresolved placeholder.
+
+| Nutrient | IFCT resolved | INDB resolved | IFCT missing | INDB missing |
+|---|--:|--:|--:|--:|
+| calories | 528 / 542 | 984 / 984 | 14 | 0 |
+| kilojoules | 528 / 542 | 984 / 984 | 14 | 0 |
+| proteins | 528 / 542 | 983 / 984 | 14 | 1 |
+| fat | 542 / 542 | 982 / 984 | 0 | 2 |
+| saturated-fat | 523 / 542 | 981 / 984 | 19 | 3 |
+| trans-fat | 2 / 542 | 0 / 984 | 540 | 984 |
+| polyunsaturated-fat | 523 / 542 | 981 / 984 | 19 | 3 |
+| monounsaturated-fat | 523 / 542 | 979 / 984 | 19 | 5 |
+| cholesterol | 534 / 542 | 621 / 984 | 8 | 363 |
+| sodium | 528 / 542 | 982 / 984 | 14 | 2 |
+| salt | 528 / 542 | 982 / 984 | 14 | 2 |
+| carbohydrates | 313 / 542 | 983 / 984 | 229 | 1 |
+| fiber | 306 / 542 | 933 / 984 | 236 | 51 |
+| sugars | 314 / 542 | 983 / 984 | 228 | 1 |
+| added-sugars | 299 / 542 | 0 / 984 | 243 | 984 |
+| calcium | 527 / 542 | 983 / 984 | 15 | 1 |
+| iron | 527 / 542 | 983 / 984 | 15 | 1 |
+| potassium | 528 / 542 | 983 / 984 | 14 | 1 |
+| magnesium | 527 / 542 | 983 / 984 | 15 | 1 |
+| zinc | 528 / 542 | 983 / 984 | 14 | 1 |
+| phosphorus | 527 / 542 | 983 / 984 | 15 | 1 |
+| vitamin-a | 481 / 542 | 618 / 984 | 61 | 366 |
+| vitamin-c | 229 / 542 | 885 / 984 | 313 | 99 |
+| vitamin-d | 498 / 542 | 945 / 984 | 44 | 39 |
+| vitamin-e | 524 / 542 | 979 / 984 | 18 | 5 |
+| vitamin-k | 519 / 542 | 969 / 984 | 23 | 15 |
+| b1 | 522 / 542 | 982 / 984 | 20 | 2 |
+| b2 | 526 / 542 | 982 / 984 | 16 | 2 |
+| b3 | 527 / 542 | 982 / 984 | 15 | 2 |
+| b6 | 528 / 542 | 981 / 984 | 14 | 3 |
+| b9 | 347 / 542 | 979 / 984 | 195 | 5 |
+| b12 | 399 / 542 | 44 / 984 | 143 | 940 |
+| caffeine | 542 / 542 | 946 / 984 | 0 | 38 |
+| alcohol | 541 / 542 | 983 / 984 | 1 | 1 |
+
+### Status breakdown (nutrients with >10% missing)
+
+| Nutrient | Dataset | sourced | derived | explicit_zero | estimated | missing |
+|---|---|--:|--:|--:|--:|--:|
+| trans-fat | IFCT | 2 | 0 | 0 | 0 | 540 |
+| trans-fat | INDB | 0 | 0 | 0 | 0 | 984 |
+| cholesterol | INDB | 621 | 0 | 0 | 0 | 363 |
+| carbohydrates | IFCT | 313 | 0 | 0 | 0 | 229 |
+| fiber | IFCT | 306 | 0 | 0 | 0 | 236 |
+| sugars | IFCT | 314 | 0 | 0 | 0 | 228 |
+| added-sugars | IFCT | 0 | 0 | 299 | 0 | 243 |
+| added-sugars | INDB | 0 | 0 | 0 | 0 | 984 |
+| vitamin-a | IFCT | 481 | 0 | 0 | 0 | 61 |
+| vitamin-a | INDB | 618 | 0 | 0 | 0 | 366 |
+| vitamin-c | IFCT | 229 | 0 | 0 | 0 | 313 |
+| vitamin-c | INDB | 885 | 0 | 0 | 0 | 99 |
+| b9 | IFCT | 347 | 0 | 0 | 0 | 195 |
+| b12 | IFCT | 26 | 0 | 323 | 50 | 143 |
+| b12 | INDB | 0 | 0 | 3 | 41 | 940 |
 
 ## Known limitations
 
-- **Vitamin B12 is absent** from both IFCT 2017 and INDB 2024.11 source data, so no B12 value is seeded. It is left empty (not fabricated); the app still shows B12 RDA targets, which will read as unmet for these items.
+- **Vitamin B12** — absent from both IFCT and INDB source columns; provenance is now mixed via supplement rules: plant foods carry `explicit_zero` (biochemically cannot contain B12), dairy/egg/meat/fish items have `sourced` or `estimated` values from USDA SR Legacy proxies with citations, and remaining items (non-vegetarian foods without a defensible proxy, most INDB recipes) stay `missing`. The app shows B12 RDA targets; unresolved `missing` entries will read as unmet.
 - **Sodium outliers:** the converter drops sodium from ~23 INDB soup/sauce rows whose source value exceeded 8000 mg/100g (physically impossible). 16 remaining recipes still report >2000 mg/100g — high but within INDB's published data; listed below for review.
 - **Per-100g fallback:** 81 condiment-type recipes (jams/sauces/etc.) have no defined Indian serving in INDB, so their values are per 100 g.
 - Trace nutrients without an app field (copper, selenium, manganese, B5, biotin, carotenoids) are intentionally not carried over.

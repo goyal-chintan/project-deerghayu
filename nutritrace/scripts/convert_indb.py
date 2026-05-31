@@ -18,9 +18,7 @@ seed time by server/seed/classify.js so the rules are unit-testable.
 """
 import os, json, math
 import openpyxl
-from nutrition_normalize import (
-    SUPPORTED_NUTRIENTS, normalize_record, apply_supplements,
-)
+from nutrition_normalize import normalize_record, apply_supplements
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "data", "Anuvaad_INDB_2024.11.xlsx")

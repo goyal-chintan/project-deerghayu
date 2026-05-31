@@ -121,8 +121,46 @@ def atwater_drift(items):
 
 
 def coverage(items, keys):
+    """Count resolved (non-missing) nutrient entries per key.
+
+    When nutrition_meta is present, a nutrient is 'resolved' if its meta status
+    is anything other than 'missing'. When nutrition_meta is absent (legacy),
+    falls back to checking key presence in the nutrition dict.
+    """
     tot = len(items)
-    return {k: sum(1 for o in items if k in o["nutrition"]) for k in keys}
+    counts = {}
+    for k in keys:
+        resolved = 0
+        for o in items:
+            meta = o.get("nutrition_meta", {}).get(k)
+            if meta is not None:
+                if meta.get("status") != "missing":
+                    resolved += 1
+            else:
+                # Legacy fallback: key presence counts as resolved
+                if k in o.get("nutrition", {}):
+                    resolved += 1
+        counts[k] = resolved
+    return counts
+
+
+def status_breakdown(items, keys):
+    """Count per-status totals across all items for each nutrient key."""
+    from collections import Counter
+    breakdown = {k: Counter() for k in keys}
+    for o in items:
+        meta = o.get("nutrition_meta", {})
+        for k in keys:
+            m = meta.get(k)
+            if m:
+                breakdown[k][m.get("status", "unknown")] += 1
+            else:
+                # Legacy: treat present keys as sourced, absent as missing
+                if k in o.get("nutrition", {}):
+                    breakdown[k]["sourced"] += 1
+                else:
+                    breakdown[k]["missing"] += 1
+    return breakdown
 
 
 def sodium_outliers(recipes):
@@ -155,13 +193,18 @@ def main():
     f_checked, f_over, f_worst = atwater_drift(foods)
     r_checked, r_over, r_worst = atwater_drift(recipes)
 
-    APP_KEYS = ["calories", "proteins", "fat", "carbohydrates", "fiber", "sugars",
-                "saturated-fat", "cholesterol", "sodium", "calcium", "iron",
-                "potassium", "magnesium", "zinc", "phosphorus", "vitamin-a",
-                "vitamin-c", "vitamin-d", "vitamin-e", "vitamin-k",
-                "b1", "b2", "b3", "b6", "b9", "b12"]
+    APP_KEYS = ["calories", "kilojoules", "proteins", "fat", "saturated-fat",
+                "trans-fat", "polyunsaturated-fat", "monounsaturated-fat",
+                "cholesterol", "sodium", "salt", "carbohydrates", "fiber",
+                "sugars", "added-sugars", "calcium", "iron", "potassium",
+                "magnesium", "zinc", "phosphorus", "vitamin-a", "vitamin-c",
+                "vitamin-d", "vitamin-e", "vitamin-k",
+                "b1", "b2", "b3", "b6", "b9", "b12",
+                "caffeine", "alcohol"]
     fcov = coverage(foods, APP_KEYS)
     rcov = coverage(recipes, APP_KEYS)
+    fbd = status_breakdown(foods, APP_KEYS)
+    rbd = status_breakdown(recipes, APP_KEYS)
     na_out = sodium_outliers(recipes)
     fallback = sum(1 for o in recipes if o.get("basis") == "per_100g")
 
@@ -203,18 +246,48 @@ def main():
         for dev, nm, k, p in r_worst:
             w(f"| INDB | {nm} | {k} | {p} | {dev*100:.0f}% |")
     w("")
-    w("## Nutrient coverage")
+    w("## Nutrient coverage (resolved provenance)")
     w("")
-    w("| Nutrient | IFCT foods | INDB recipes |")
-    w("|---|--:|--:|")
+    w("Counts entries with `nutrition_meta.status` ≠ `missing` — i.e. sourced, "
+      "derived, explicit_zero, or estimated. Missing = unresolved placeholder.")
+    w("")
+    w("| Nutrient | IFCT resolved | INDB resolved | IFCT missing | INDB missing |")
+    w("|---|--:|--:|--:|--:|")
     for k in APP_KEYS:
-        w(f"| {k} | {fcov[k]} / {len(foods)} | {rcov[k]} / {len(recipes)} |")
+        fm = fbd[k].get("missing", 0)
+        rm = rbd[k].get("missing", 0)
+        w(f"| {k} | {fcov[k]} / {len(foods)} | {rcov[k]} / {len(recipes)} "
+          f"| {fm} | {rm} |")
     w("")
+    # Status breakdown summary for nutrients with significant missing counts
+    sig_missing = [(k, fbd[k].get("missing", 0), rbd[k].get("missing", 0))
+                   for k in APP_KEYS
+                   if fbd[k].get("missing", 0) > len(foods)*0.1
+                   or rbd[k].get("missing", 0) > len(recipes)*0.1]
+    if sig_missing:
+        w("### Status breakdown (nutrients with >10% missing)")
+        w("")
+        w("| Nutrient | Dataset | sourced | derived | explicit_zero | estimated | missing |")
+        w("|---|---|--:|--:|--:|--:|--:|")
+        for k, fm, rm in sig_missing:
+            if fm > len(foods)*0.1:
+                bd = fbd[k]
+                w(f"| {k} | IFCT | {bd.get('sourced',0)} | {bd.get('derived',0)} "
+                  f"| {bd.get('explicit_zero',0)} | {bd.get('estimated',0)} | {bd.get('missing',0)} |")
+            if rm > len(recipes)*0.1:
+                bd = rbd[k]
+                w(f"| {k} | INDB | {bd.get('sourced',0)} | {bd.get('derived',0)} "
+                  f"| {bd.get('explicit_zero',0)} | {bd.get('estimated',0)} | {bd.get('missing',0)} |")
+        w("")
     w("## Known limitations")
     w("")
-    w("- **Vitamin B12 is absent** from both IFCT 2017 and INDB 2024.11 source "
-      "data, so no B12 value is seeded. It is left empty (not fabricated); the "
-      "app still shows B12 RDA targets, which will read as unmet for these items.")
+    w("- **Vitamin B12** — absent from both IFCT and INDB source columns; "
+      "provenance is now mixed via supplement rules: plant foods carry "
+      "`explicit_zero` (biochemically cannot contain B12), dairy/egg/meat/fish "
+      "items have `sourced` or `estimated` values from USDA SR Legacy proxies "
+      "with citations, and remaining items (non-vegetarian foods without a "
+      "defensible proxy, most INDB recipes) stay `missing`. The app shows B12 "
+      "RDA targets; unresolved `missing` entries will read as unmet.")
     w("- **Sodium outliers:** the converter drops sodium from ~23 INDB soup/sauce "
       "rows whose source value exceeded 8000 mg/100g (physically impossible). "
       f"{len(na_out)} remaining recipes still report >{int(SODIUM_REPORT_FLOOR)} "

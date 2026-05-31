@@ -10,9 +10,7 @@ Nutrition values are factual; provenance is recorded per row. AGPL-licensed
 extract — only numeric facts + citation are carried over (license mitigation).
 """
 import os, json, math, urllib.request
-from nutrition_normalize import (
-    SUPPORTED_NUTRIENTS, normalize_record, apply_supplements,
-)
+from nutrition_normalize import normalize_record, apply_supplements
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(HERE, "data", "ifct_compositions.csv")
