@@ -18,6 +18,7 @@
   import FastingInsights from '../components/diary/FastingInsights.svelte';
   import { isNative } from '../lib/platform.js';
   import StatsBanner from '../components/banners/StatsBanner.svelte';
+  import NutritionAnalyticsPanel from '../components/nutrition/NutritionAnalyticsPanel.svelte';
   let _waterShowInStats = DB.getSetting('waterShowInStats', true);
   let _waterUnit        = DB.getSetting('waterUnit', 'ml');
   // Reload when settings change
@@ -43,6 +44,7 @@
   let loading = false;
   let summary = null; // { avg, min, max, total, daysWithData }
   let _loadVer = 0;   // cancel stale concurrent loadData calls
+  let activeStatsView = 'charts';
 
   // Cumulative metrics accumulate throughout the day (calories, steps, water, etc.).
   // Excluded from charts by default until the day is complete to avoid trend distortion.
@@ -310,7 +312,7 @@
   }
 
   function renderChart() {
-    if (!canvasEl) return;
+    if (activeStatsView !== 'charts' || !canvasEl) return;
     if (chart) { chart.destroy(); chart = null; }
 
     const isDark      = document.documentElement.getAttribute('data-theme') !== 'light';
@@ -480,8 +482,8 @@
     return m ? (m.unit || '') : '';
   })();
 
-  $: { metric; range; customStart; customEnd; $statsIncludeToday; $statsShowEmptyDays; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
-       if (canvasEl) loadData(); }
+  $: { metric; range; customStart; customEnd; activeStatsView; $statsIncludeToday; $statsShowEmptyDays; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
+       if (activeStatsView === 'charts' && canvasEl) loadData(); }
 
   onDestroy(() => { if (chart) chart.destroy(); });
 
@@ -533,15 +535,45 @@
     else customEnd = ds;
     showCalFor = null;
   }
+
+  $: if (activeStatsView !== 'charts') {
+    showCalFor = null;
+    if (chart) { chart.destroy(); chart = null; }
+  }
 </script>
 
 <div class="page-shell">
   <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'}>
     {#if $bannerStyle === 'animated'}<StatsBanner />{/if}
     <h1>{$_('routes.statistics.title')}</h1>
+    <div class="stats-view-switch" role="tablist" aria-label="Statistics view">
+      <button
+        class="stats-view-tab"
+        class:active={activeStatsView === 'charts'}
+        id="statistics-charts-tab"
+        role="tab"
+        aria-selected={activeStatsView === 'charts'}
+        aria-controls="statistics-charts-panel"
+        on:click={() => activeStatsView = 'charts'}
+      >
+        Charts
+      </button>
+      <button
+        class="stats-view-tab"
+        class:active={activeStatsView === 'nutrition'}
+        id="statistics-nutrition-tab"
+        role="tab"
+        aria-selected={activeStatsView === 'nutrition'}
+        aria-controls="statistics-nutrition-panel"
+        on:click={() => activeStatsView = 'nutrition'}
+      >
+        Nutrition
+      </button>
+    </div>
   </header>
 
-  <div class="stats-content">
+  {#if activeStatsView === 'charts'}
+  <div class="stats-content" id="statistics-charts-panel" role="tabpanel" aria-labelledby="statistics-charts-tab">
     <!-- Metric selector (scrollable) -->
     <div class="metric-scroll" use:dragScroll>
       {#each METRICS as m}
@@ -691,10 +723,15 @@
 
     <div style="height:16px"></div>
   </div>
+  {:else if activeStatsView === 'nutrition'}
+    <div class="nutrition-tab-content" id="statistics-nutrition-panel" role="tabpanel" aria-labelledby="statistics-nutrition-tab">
+      <NutritionAnalyticsPanel />
+    </div>
+  {/if}
 </div>
 
 <!-- Custom range calendar sheet -->
-{#if showCalFor}
+{#if activeStatsView === 'charts' && showCalFor}
   <div use:portal class="stat-backdrop" role="dialog" aria-modal="true"
     on:click={() => showCalFor = null} on:keydown={() => {}}>
     <div class="stat-cal-sheet" on:click|stopPropagation on:keydown={() => {}}>
@@ -757,6 +794,41 @@
 {/if}
 
 <style>
+
+  .stats-view-switch {
+    display: inline-flex;
+    gap: 3px;
+    padding: 3px;
+    margin-top: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    width: fit-content;
+  }
+
+  .stats-view-tab {
+    min-width: 96px;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast);
+  }
+
+  .stats-view-tab.active {
+    background: var(--surface-1);
+    color: var(--accent);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .nutrition-tab-content {
+    padding: 12px var(--page-px) 0;
+  }
 
   .stats-content {
     display: flex;
