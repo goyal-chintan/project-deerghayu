@@ -338,16 +338,20 @@ def status_breakdown(items, keys):
 
 def sodium_outliers(recipes):
     """SOFT: flag recipes with very high sodium per 100g.
-    Skips rows with non-dict nutrition or non-numeric sodium."""
+    Skips rows with non-dict nutrition, non-numeric sodium, or
+    non-numeric/non-positive serving_grams (falls back to 100g)."""
     out = []
     for o in recipes:
         nut = o.get("nutrition")
         if not isinstance(nut, dict):
             continue
-        sg = o.get("serving_grams") or 100
         na = nut.get("sodium")
         if not isinstance(na, (int, float)) or isinstance(na, bool):
             continue
+        sg_raw = o.get("serving_grams")
+        sg = _safe_num(sg_raw)
+        if sg <= 0:
+            sg = 100  # fallback to per-100g basis
         per100 = na / sg * 100
         if per100 >= SODIUM_REPORT_FLOOR:
             out.append((per100, round(na, 0), o["name"]))

@@ -15,9 +15,6 @@ Run: python3 nutritrace/scripts/test_validate_data.py
 """
 import sys
 import os
-import tempfile
-import json
-import shutil
 
 # Add scripts dir to path for importing
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
@@ -342,6 +339,80 @@ if result is not None:
     fails, rows = result
     assert_true(any("not a dict" in f for f in fails),
                 "Hard issue for list nutrition on anchor")
+
+# -----------------------------------------------------------------------
+# Test 17: sodium_outliers with malformed serving_grams
+# -----------------------------------------------------------------------
+print("\n[Test 17] sodium_outliers with malformed serving_grams")
+
+# String serving_grams — previously crashed with TypeError
+recipes_str_sg = [
+    {"name": "Salty dish", "nutrition": {"sodium": 3000.0},
+     "serving_grams": "200"},
+]
+result = assert_no_crash(vd.sodium_outliers, recipes_str_sg,
+                         msg="sodium_outliers handles string serving_grams")
+if result is not None:
+    # sg falls back to 100 → 3000/100*100 = 3000 mg/100g → flagged
+    assert_true(len(result) > 0,
+                "Flags high sodium (falls back to 100g basis)")
+
+# Bool serving_grams
+recipes_bool_sg = [
+    {"name": "Bool dish", "nutrition": {"sodium": 2500.0},
+     "serving_grams": True},
+]
+result = assert_no_crash(vd.sodium_outliers, recipes_bool_sg,
+                         msg="sodium_outliers handles bool serving_grams")
+if result is not None:
+    # Bool → _safe_num returns 0 → falls back to 100g
+    assert_true(len(result) > 0,
+                "Flags high sodium (bool sg falls back to 100g)")
+
+# None serving_grams
+recipes_none_sg = [
+    {"name": "None dish", "nutrition": {"sodium": 2100.0},
+     "serving_grams": None},
+]
+result = assert_no_crash(vd.sodium_outliers, recipes_none_sg,
+                         msg="sodium_outliers handles None serving_grams")
+if result is not None:
+    assert_true(len(result) > 0,
+                "Flags high sodium (None sg falls back to 100g)")
+
+# Zero serving_grams (non-positive)
+recipes_zero_sg = [
+    {"name": "Zero dish", "nutrition": {"sodium": 2100.0},
+     "serving_grams": 0},
+]
+result = assert_no_crash(vd.sodium_outliers, recipes_zero_sg,
+                         msg="sodium_outliers handles zero serving_grams")
+if result is not None:
+    assert_true(len(result) > 0,
+                "Flags high sodium (zero sg falls back to 100g)")
+
+# Negative serving_grams
+recipes_neg_sg = [
+    {"name": "Neg dish", "nutrition": {"sodium": 2100.0},
+     "serving_grams": -50},
+]
+result = assert_no_crash(vd.sodium_outliers, recipes_neg_sg,
+                         msg="sodium_outliers handles negative serving_grams")
+if result is not None:
+    assert_true(len(result) > 0,
+                "Flags high sodium (negative sg falls back to 100g)")
+
+# Valid serving_grams still works correctly
+recipes_valid_sg = [
+    {"name": "Normal dish", "nutrition": {"sodium": 500.0},
+     "serving_grams": 250},
+]
+result = assert_no_crash(vd.sodium_outliers, recipes_valid_sg,
+                         msg="sodium_outliers works with valid serving_grams")
+if result is not None:
+    # 500/250*100 = 200 mg/100g → below threshold, not flagged
+    assert_eq(result, [],
+              "Normal sodium not flagged (200 mg/100g < 2000 threshold)")
 
 # -----------------------------------------------------------------------
 # Summary
