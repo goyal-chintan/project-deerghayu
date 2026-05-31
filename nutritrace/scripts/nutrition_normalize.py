@@ -84,16 +84,16 @@ def normalize_record(record, source_name, source_values, zero_rules=None, derive
                 nutrition[nid] = val
                 meta[nid] = make_meta("measured", source_name)
 
-    # Phase 2: Derive kilojoules from calories
+    # Phase 2: Derive kilojoules from calories (trigger on any valid value incl. 0)
     if "kilojoules" in derived_rules and "kilojoules" not in nutrition:
-        if "calories" in nutrition and nutrition["calories"] > 0:
+        if "calories" in nutrition and isinstance(nutrition["calories"], (int, float)) and nutrition["calories"] >= 0:
             nutrition["kilojoules"] = round(nutrition["calories"] * KCAL_TO_KJ, 1)
             meta["kilojoules"] = make_meta("derived", source_name,
                                            citation="calories * 4.184")
 
-    # Phase 3: Derive salt from sodium (sodium in mg -> salt in g)
+    # Phase 3: Derive salt from sodium (sodium in mg -> salt in g; trigger incl. 0)
     if "salt" in derived_rules and "salt" not in nutrition:
-        if "sodium" in nutrition and nutrition["sodium"] > 0:
+        if "sodium" in nutrition and isinstance(nutrition["sodium"], (int, float)) and nutrition["sodium"] >= 0:
             nutrition["salt"] = round(nutrition["sodium"] / SODIUM_MG_PER_SALT_G, 3)
             meta["salt"] = make_meta("derived", source_name,
                                      citation="sodium_mg / 400")
