@@ -3,27 +3,32 @@
   import { push } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
   import { NtApi } from '../lib/api.js';
-  import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
   import { localDateStr } from '../lib/db.js';
+  import { summarizeFamilyNutrition } from '../lib/familyNutrition.js';
   import { goals } from '../stores/settings.js';
   import { currentUser } from '../stores/auth.js';
-
-  // Nutriments to track on dashboard
-  const TRACKED_NUTRIMENTS = [
-    'calories', 'proteins', 'fat', 'carbohydrates', 'fiber',
-    'calcium', 'iron', 'zinc', 'vitamin-a', 'vitamin-c', 'vitamin-d', 'b12', 'b9'
-  ];
 
   let familyMembers = [];
   let entry = null;
   let loading = true;
   let today = localDateStr();
+  let nutritionSummary = summarizeFamilyNutrition();
+  let recommendations = [];
+  let highImpactCount = 0;
+  let needsAttentionCount = 0;
 
-  // Computed data
-  let memberCards = [];
-  let mealsLogged = 0;
-  let totalMeals = 4;
-  let topDeficit = null;
+  $: nutritionSummary = summarizeFamilyNutrition({
+    members: familyMembers,
+    currentUser: $currentUser,
+    goals: $goals,
+    items: entry?.items || [],
+    maxRecommendations: 3,
+  });
+  $: recommendations = (nutritionSummary.recommendations || []).slice(0, 3);
+  $: highImpactCount = (nutritionSummary.analyticsRows || [])
+    .filter(row => row.status?.key !== 'on_track').length;
+  $: needsAttentionCount = (nutritionSummary.analyticsRows || [])
+    .filter(row => row.status?.key === 'needs_attention').length;
 
   onMount(async () => {
     await loadDashboardData();
@@ -38,8 +43,6 @@
       ]);
       familyMembers = Array.isArray(members) ? members : [];
       entry = diaryEntry;
-      computeMemberCards();
-      computeSummary();
     } catch (err) {
       console.error('[Dashboard] load error:', err);
     } finally {
@@ -47,135 +50,16 @@
     }
   }
 
-  function computeMemberCards() {
-    // Build "me" + all family members
-    const allMembers = [
-      { id: 'me', name: $currentUser?.full_name || 'Myself', age: null, gender: null, targets: null, isMe: true },
-      ...familyMembers
-    ];
-
-    // Sum nutrients per member from diary items
-    const memberTotals = {};
-    for (const m of allMembers) {
-      memberTotals[m.id] = {};
-      for (const nid of TRACKED_NUTRIMENTS) {
-        memberTotals[m.id][nid] = 0;
-      }
-    }
-
-    if (entry?.items) {
-      for (const item of entry.items) {
-        const id = item.member_id || 'me';
-        if (memberTotals[id]) {
-          const calc = Nutrition.calculate(item);
-          for (const nid of TRACKED_NUTRIMENTS) {
-            memberTotals[id][nid] += calc[nid] || 0;
-          }
-        }
-      }
-    }
-
-    // Build cards with progress info
-    memberCards = allMembers.map(m => {
-      const totals = memberTotals[m.id];
-      const calTarget = getTarget(m, 'calories');
-      const calPct = calTarget ? Math.min(Math.round(totals.calories / calTarget * 100), 100) : 0;
-
-      // Find lacking nutrients (< 80% of target)
-      const lacking = [];
-      for (const nid of TRACKED_NUTRIMENTS) {
-        if (nid === 'calories') continue;
-        const tgt = getTarget(m, nid);
-        if (tgt && tgt > 0) {
-          const pct = Math.round(totals[nid] / tgt * 100);
-          if (pct < 80) {
-            const nDef = NUTRIMENTS.find(n => n.id === nid);
-            lacking.push({ id: nid, label: nDef?.label || nid, pct });
-          }
-        }
-      }
-      // Sort by worst deficit
-      lacking.sort((a, b) => a.pct - b.pct);
-
-      const hasTargets = calTarget != null;
-
-      return {
-        ...m,
-        calPct,
-        calTarget,
-        calCurrent: Math.round(totals.calories),
-        lacking: lacking.slice(0, 3),
-        onTrack: hasTargets && lacking.length === 0,
-        hasTargets
-      };
-    });
+  function openNutrientAnalytics() {
+    push('/nutrients');
   }
 
-  function getTarget(member, nutrientId) {
-    if (member.isMe) {
-      // Use user's goals store
-      const g = $goals[nutrientId];
-      if (!g) return null;
-      if (g.isPercent) {
-        const density = { fat: 9, carbohydrates: 4, proteins: 4 }[nutrientId];
-        const calGoal = $goals.calories?.max ?? $goals.calories?.min ?? 2000;
-        return density ? Math.round(calGoal * (g.max ?? g.min) / 100 / density) : (g.max ?? g.min);
-      }
-      return g.max ?? g.min ?? null;
-    }
-    // Family member targets
-    return member.targets?.[nutrientId] ?? null;
-  }
-
-  function computeSummary() {
-    // Count meals logged (non-empty meal slots)
-    if (entry?.items) {
-      const usedMeals = new Set(entry.items.map(i => i.meal));
-      mealsLogged = usedMeals.size;
-    } else {
-      mealsLogged = 0;
-    }
-
-    // Top family-average deficit
-    if (memberCards.length > 0) {
-      const deficits = {};
-      let count = 0;
-      for (const card of memberCards) {
-        for (const l of card.lacking) {
-          if (!deficits[l.label]) deficits[l.label] = { sum: 0, count: 0 };
-          deficits[l.label].sum += l.pct;
-          deficits[l.label].count += 1;
-        }
-        count++;
-      }
-      let worst = null;
-      for (const [label, d] of Object.entries(deficits)) {
-        const avg = Math.round(d.sum / count);
-        if (!worst || avg < worst.pct) {
-          worst = { label, pct: avg };
-        }
-      }
-      topDeficit = worst;
-    }
-  }
-
-  function getGenderIcon(gender) {
-    if (!gender) return '';
-    const g = gender.toLowerCase();
-    if (g === 'male' || g === 'm') return 'M';
-    if (g === 'female' || g === 'f') return 'F';
-    return '';
-  }
-
-  function getProgressColor(pct) {
-    if (pct >= 80) return 'var(--accent, #4ffbb0)';
-    if (pct >= 50) return 'var(--warning, #f59e0b)';
-    return 'var(--error, #ef4444)';
+  function recommendationLabel(recommendation) {
+    return `View nutrient analytics for ${recommendation.label}: ${recommendation.foodMove}`;
   }
 </script>
 
 <div class="dashboard" in:fade={{ duration: 180 }}>
-  <!-- Header -->
   <header class="dash-header">
     <div class="dash-title-row">
       <span class="material-symbols-rounded dash-icon">family_restroom</span>
@@ -185,119 +69,154 @@
   </header>
 
   {#if loading}
-    <div class="dash-loading">
+    <div class="dash-loading" role="status" aria-live="polite">
       <span class="material-symbols-rounded spin">progress_activity</span>
       <p>Loading...</p>
     </div>
   {:else}
-    <!-- Member Cards Grid -->
-    <section class="member-grid">
-      {#each memberCards as card (card.id)}
-        <div class="member-card" in:fade={{ duration: 150 }}>
-          <div class="member-header">
-            <span class="member-name">{card.name}</span>
-            {#if card.age || card.gender}
-              <span class="member-meta">
-                {#if card.age}{card.age} yrs{/if}
-                {#if card.age && getGenderIcon(card.gender)}&nbsp;·&nbsp;{/if}
-                {#if getGenderIcon(card.gender)}{getGenderIcon(card.gender)}{/if}
-              </span>
-            {/if}
-          </div>
-
-          <!-- Calorie Progress -->
-          <div class="cal-row">
-            <span class="cal-label">Cal</span>
-            <div class="progress-track">
-              <div
-                class="progress-fill"
-                style="width: {card.calPct}%; background: {getProgressColor(card.calPct)}"
-              ></div>
-            </div>
-            <span class="cal-pct" style="color: {getProgressColor(card.calPct)}">{card.calPct}%</span>
-          </div>
-
-          <!-- Lacking nutrients or on-track -->
-          <div class="member-status">
-            {#if !card.hasTargets}
-              <span class="chip info">
-                <span class="material-symbols-rounded status-icon">target</span>
-                Set goals
-              </span>
-            {:else if card.onTrack}
-              <span class="on-track">
-                <span class="material-symbols-rounded status-icon">check_circle</span>
-                On track
-              </span>
-            {:else}
-              {#each card.lacking as deficit}
-                <span class="deficit-tag">
-                  <span class="material-symbols-rounded status-icon warn-icon">warning</span>
-                  {deficit.label} {deficit.pct}%
-                </span>
-              {/each}
-            {/if}
-          </div>
+    <section class="family-summary-card" aria-labelledby="family-summary-title">
+      <div class="summary-hero">
+        <div class="summary-copy">
+          <p class="summary-eyebrow">Family nutrition today</p>
+          <h2 id="family-summary-title" class="summary-headline">{nutritionSummary.headline}</h2>
+          <p class="summary-context">
+            {nutritionSummary.mealsLogged} {nutritionSummary.mealsLogged === 1 ? 'meal' : 'meals'} logged ·
+            {highImpactCount} high-impact {highImpactCount === 1 ? 'improvement' : 'improvements'}
+          </p>
         </div>
-      {/each}
-
-      {#if familyMembers.length === 0}
-        <div class="empty-state">
-          <span class="material-symbols-rounded empty-icon">group_add</span>
-          <p>No family members yet</p>
-          <button class="btn-accent" on:click={() => push('/family')}>
-            Add Members
+        <div class="summary-actions" aria-label="Nutrition actions">
+          <button
+            type="button"
+            class="primary-action"
+            on:click={() => push('/planner')}
+            aria-label="Plan the next meal"
+          >
+            <span class="material-symbols-rounded">calendar_month</span>
+            <span>Plan next meal</span>
+          </button>
+          <button
+            type="button"
+            class="secondary-action"
+            on:click={openNutrientAnalytics}
+            aria-label="View nutrient analytics"
+          >
+            View nutrient analytics
           </button>
         </div>
-      {/if}
-    </section>
-
-    <!-- Quick Actions -->
-    <section class="quick-actions">
-      <h2 class="section-title">Quick Actions</h2>
-      <div class="actions-grid">
-        <button class="action-btn" on:click={() => push('/planner')}>
-          <span class="material-symbols-rounded">calendar_month</span>
-          <span>Plan Today</span>
-        </button>
-        <button class="action-btn" on:click={() => push('/nutrients')}>
-          <span class="material-symbols-rounded">science</span>
-          <span>Nutrients</span>
-        </button>
-        <button class="action-btn" on:click={() => push('/')}>
-          <span class="material-symbols-rounded">edit_note</span>
-          <span>Log Meal</span>
-        </button>
-        <button class="action-btn" on:click={() => push('/family')}>
-          <span class="material-symbols-rounded">family_restroom</span>
-          <span>Edit Family</span>
-        </button>
       </div>
-    </section>
 
-    <!-- Today's Summary -->
-    <section class="today-summary">
-      <h2 class="section-title">Today's Summary</h2>
-      <div class="summary-card">
-        <div class="summary-row">
-          <span class="material-symbols-rounded summary-icon">restaurant</span>
-          <span class="summary-label">Meals logged</span>
-          <span class="summary-value">{mealsLogged} of {totalMeals}</span>
+      <div class="summary-metrics" aria-label="Family nutrition summary metrics">
+        <article class="metric-card coverage-card">
+          <div>
+            <p class="metric-label">Overall coverage</p>
+            <p class="metric-value">{nutritionSummary.overallCoverage}%</p>
+          </div>
+          <div
+            class="coverage-track"
+            role="progressbar"
+            aria-label="Overall family nutrition coverage"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow={nutritionSummary.overallCoverage}
+          >
+            <span class="coverage-fill" style="--coverage: {nutritionSummary.overallCoverage}%"></span>
+          </div>
+        </article>
+
+        <article class="metric-card">
+          <p class="metric-label">Needs attention</p>
+          <p class="metric-value">{needsAttentionCount}</p>
+          <p class="metric-note">{needsAttentionCount === 1 ? 'priority area' : 'priority areas'}</p>
+        </article>
+
+        <article class="metric-card next-action-card">
+          <p class="metric-label">Best next action</p>
+          <p class="metric-action">{nutritionSummary.bestNextAction}</p>
+        </article>
+      </div>
+
+      {#if nutritionSummary.dataState === 'no_meals'}
+        <div class="empty-guidance" role="note" aria-label="No meals logged guidance">
+          <span class="material-symbols-rounded guidance-icon">restaurant</span>
+          <div class="guidance-copy">
+            <h3>Start with one logged meal</h3>
+            <p>Log what the family ate today, then Nutritrace can turn coverage into useful next-meal ideas.</p>
+          </div>
+          <button
+            type="button"
+            class="guidance-action"
+            on:click={() => push('/')}
+            aria-label="Log the first meal"
+          >
+            Log meal
+          </button>
         </div>
-        {#if topDeficit}
-          <div class="summary-row">
-            <span class="material-symbols-rounded summary-icon warn-icon">warning</span>
-            <span class="summary-label">Top deficit</span>
-            <span class="summary-value deficit">{topDeficit.label} (avg {topDeficit.pct}%)</span>
+      {:else if nutritionSummary.dataState === 'no_family'}
+        <div class="empty-guidance" role="note" aria-label="Family setup guidance">
+          <span class="material-symbols-rounded guidance-icon">group_add</span>
+          <div class="guidance-copy">
+            <h3>Add family members for shared coverage</h3>
+            <p>Set up family profiles to compare today’s nutrition needs without crowding the dashboard.</p>
           </div>
-        {:else}
-          <div class="summary-row">
-            <span class="material-symbols-rounded summary-icon good-icon">check_circle</span>
-            <span class="summary-label">Status</span>
-            <span class="summary-value good">All on track!</span>
+          <button
+            type="button"
+            class="guidance-action"
+            on:click={() => push('/family')}
+            aria-label="Add family members"
+          >
+            Add members
+          </button>
+        </div>
+      {:else if nutritionSummary.dataState === 'missing_targets'}
+        <div class="empty-guidance" role="note" aria-label="Nutrition targets guidance">
+          <span class="material-symbols-rounded guidance-icon">track_changes</span>
+          <div class="guidance-copy">
+            <h3>Set targets to unlock guidance</h3>
+            <p>Nutrition targets help rank the most useful planning actions for each family member.</p>
           </div>
-        {/if}
-      </div>
+          <button
+            type="button"
+            class="guidance-action"
+            on:click={() => push('/family')}
+            aria-label="Set family nutrition targets"
+          >
+            Set targets
+          </button>
+        </div>
+      {:else if recommendations.length > 0}
+        <div class="recommendations-panel" aria-labelledby="recommendations-title">
+          <div class="panel-heading">
+            <h3 id="recommendations-title">Recommended improvements</h3>
+            <p>Open analytics for details, affected members, and food sources.</p>
+          </div>
+          <div class="recommendation-list">
+            {#each recommendations as recommendation (recommendation.id)}
+              <button
+                type="button"
+                class="recommendation-row"
+                on:click={openNutrientAnalytics}
+                aria-label={recommendationLabel(recommendation)}
+              >
+                <span class="recommendation-icon material-symbols-rounded">trending_up</span>
+                <span class="recommendation-body">
+                  <span class="recommendation-title">{recommendation.label}</span>
+                  <span class="recommendation-detail">{recommendation.foodMove}</span>
+                </span>
+                <span class="recommendation-meta">{recommendation.affectedLabel}</span>
+                <span class="material-symbols-rounded recommendation-arrow" aria-hidden="true">chevron_right</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+      {:else}
+        <div class="steady-state" role="note" aria-label="Family nutrition on track">
+          <span class="material-symbols-rounded steady-icon">check_circle</span>
+          <div>
+            <h3>No high-impact gaps right now</h3>
+            <p>Keep logging meals or open analytics to review detailed coverage.</p>
+          </div>
+        </div>
+      {/if}
     </section>
   {/if}
 </div>
@@ -309,11 +228,11 @@
     margin: 0 auto;
   }
 
-  /* Header */
   .dash-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 16px;
     margin-bottom: 20px;
     padding: 0 4px;
   }
@@ -336,9 +255,9 @@
     font-size: 13px;
     color: var(--text-3);
     font-weight: 500;
+    white-space: nowrap;
   }
 
-  /* Loading */
   .dash-loading {
     display: flex;
     flex-direction: column;
@@ -354,228 +273,337 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Member Grid */
-  .member-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 14px;
-    margin-bottom: 28px;
-  }
-
-  .member-card {
+  .family-summary-card {
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg, 16px);
-    padding: 16px 18px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.10);
+  }
+
+  .summary-hero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  .summary-copy {
+    min-width: 0;
+  }
+  .summary-eyebrow {
+    margin: 0 0 8px;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .summary-headline {
+    margin: 0;
+    color: var(--text-1);
+    font-size: clamp(22px, 5vw, 34px);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+  }
+  .summary-context {
+    margin: 10px 0 0;
+    color: var(--text-2);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .summary-actions {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    transition: transform var(--dur-fast, 0.15s), box-shadow var(--dur-fast, 0.15s);
+    align-items: stretch;
+    min-width: 180px;
   }
-  .member-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  .primary-action,
+  .secondary-action,
+  .guidance-action,
+  .recommendation-row {
+    font: inherit;
+    -webkit-tap-highlight-color: transparent;
   }
-
-  .member-header {
-    display: flex;
-    align-items: baseline;
+  .primary-action,
+  .secondary-action,
+  .guidance-action {
+    min-height: 44px;
+    border-radius: var(--radius-md, 12px);
+    border: 1px solid transparent;
+    padding: 10px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color var(--dur-fast, 0.15s), border-color var(--dur-fast, 0.15s), opacity var(--dur-fast, 0.15s), transform var(--dur-fast, 0.15s);
   }
-  .member-name {
-    font-size: 16px;
-    font-weight: 650;
+  .primary-action {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: var(--accent-text, #0A0B0F);
+  }
+  .primary-action .material-symbols-rounded {
+    font-size: 20px;
+  }
+  .secondary-action,
+  .guidance-action {
+    background: var(--surface-2);
+    border-color: var(--border);
     color: var(--text-1);
   }
-  .member-meta {
-    font-size: 12px;
-    color: var(--text-3);
-    font-weight: 500;
+  .primary-action:hover,
+  .secondary-action:hover,
+  .guidance-action:hover {
+    opacity: 0.9;
+  }
+  .primary-action:active,
+  .secondary-action:active,
+  .guidance-action:active,
+  .recommendation-row:active {
+    transform: translateY(1px);
+  }
+  .primary-action:focus-visible,
+  .secondary-action:focus-visible,
+  .guidance-action:focus-visible,
+  .recommendation-row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
   }
 
-  /* Calorie Progress Row */
-  .cal-row {
+  .summary-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .metric-card {
+    min-height: 112px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 12px);
+    padding: 16px;
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
   }
-  .cal-label {
-    font-size: 12px;
-    font-weight: 600;
+  .metric-label,
+  .metric-note {
+    margin: 0;
     color: var(--text-2);
-    width: 28px;
-    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 650;
   }
-  .progress-track {
-    flex: 1;
+  .metric-value {
+    margin: 4px 0 0;
+    color: var(--text-1);
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+  }
+  .metric-action {
+    margin: 0;
+    color: var(--text-1);
+    font-size: 17px;
+    font-weight: 750;
+    line-height: 1.25;
+  }
+  .coverage-track {
     height: 8px;
-    background: var(--surface-2, rgba(255,255,255,0.06));
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface-3, var(--surface-2)));
     border-radius: var(--radius-full, 999px);
     overflow: hidden;
   }
-  .progress-fill {
+  .coverage-fill {
+    display: block;
+    width: var(--coverage);
     height: 100%;
-    border-radius: var(--radius-full, 999px);
-    transition: width 0.6s ease;
-  }
-  .cal-pct {
-    font-size: 12px;
-    font-weight: 700;
-    width: 36px;
-    text-align: right;
-  }
-
-  /* Status */
-  .member-status {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    min-height: 22px;
-  }
-  .on-track {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--accent, #4ffbb0);
-  }
-  .deficit-tag {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--warning, #f59e0b);
-    background: color-mix(in srgb, var(--warning, #f59e0b) 10%, transparent);
-    padding: 2px 8px;
-    border-radius: var(--radius-full, 999px);
-  }
-  .chip.info {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--accent, #4ffbb0);
-    background: var(--accent-dim, color-mix(in srgb, var(--accent, #4ffbb0) 10%, transparent));
-    padding: 2px 8px;
-    border-radius: var(--radius-full, 999px);
-  }
-  .status-icon {
-    font-size: 14px;
-  }
-  .warn-icon {
-    color: var(--warning, #f59e0b);
-  }
-
-  /* Empty state */
-  .empty-state {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    padding: 48px 16px;
-    color: var(--text-3);
-  }
-  .empty-icon {
-    font-size: 48px;
-    opacity: 0.5;
-  }
-  .btn-accent {
     background: var(--accent);
-    color: var(--bg, #000);
-    border: none;
-    border-radius: var(--radius-md, 12px);
-    padding: 10px 20px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform var(--dur-fast, 0.15s);
+    border-radius: inherit;
   }
-  .btn-accent:active { transform: scale(0.95); }
 
-  /* Quick Actions */
-  .section-title {
-    font-size: 15px;
-    font-weight: 650;
-    color: var(--text-2);
-    margin: 0 0 12px 4px;
-  }
-  .quick-actions {
-    margin-bottom: 28px;
-  }
-  .actions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 10px;
-  }
-  .action-btn {
+  .empty-guidance,
+  .steady-state {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 14px 16px;
-    background: var(--surface-1);
+    gap: 14px;
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
     border: 1px solid var(--border);
     border-radius: var(--radius-md, 12px);
-    color: var(--text-1);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background var(--dur-fast, 0.15s), transform var(--dur-fast, 0.15s);
-    -webkit-tap-highlight-color: transparent;
+    padding: 16px;
   }
-  .action-btn:hover {
-    background: var(--surface-2);
-  }
-  .action-btn:active {
-    transform: scale(0.96);
-  }
-  .action-btn .material-symbols-rounded {
-    font-size: 20px;
+  .guidance-icon,
+  .steady-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md, 12px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    background: var(--accent-dim);
     color: var(--accent);
+    font-size: 24px;
+  }
+  .guidance-copy,
+  .steady-state > div {
+    flex: 1;
+    min-width: 0;
+  }
+  .guidance-copy h3,
+  .steady-state h3 {
+    margin: 0 0 4px;
+    color: var(--text-1);
+    font-size: 15px;
+    font-weight: 750;
+  }
+  .guidance-copy p,
+  .steady-state p {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 13px;
+    line-height: 1.45;
   }
 
-  /* Today's Summary */
-  .today-summary {
-    margin-bottom: 16px;
-  }
-  .summary-card {
-    background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg, 16px);
-    padding: 16px 18px;
+  .recommendations-panel {
     display: flex;
     flex-direction: column;
     gap: 12px;
   }
-  .summary-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .summary-icon {
-    font-size: 20px;
-    color: var(--text-3);
-  }
-  .summary-icon.good-icon {
-    color: var(--accent, #4ffbb0);
-  }
-  .summary-label {
-    flex: 1;
-    font-size: 14px;
-    color: var(--text-2);
-  }
-  .summary-value {
-    font-size: 14px;
-    font-weight: 600;
+  .panel-heading h3 {
+    margin: 0 0 4px;
     color: var(--text-1);
+    font-size: 16px;
+    font-weight: 750;
   }
-  .summary-value.deficit {
-    color: var(--warning, #f59e0b);
+  .panel-heading p {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 13px;
+    line-height: 1.45;
   }
-  .summary-value.good {
-    color: var(--accent, #4ffbb0);
+  .recommendation-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .recommendation-row {
+    min-height: 56px;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 12px);
+    background: var(--surface-2);
+    color: var(--text-1);
+    padding: 12px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--dur-fast, 0.15s), border-color var(--dur-fast, 0.15s), transform var(--dur-fast, 0.15s);
+  }
+  .recommendation-row:hover {
+    background: var(--surface-3, var(--surface-2));
+    border-color: var(--border-strong, var(--border));
+  }
+  .recommendation-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md, 12px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 20px;
+  }
+  .recommendation-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  .recommendation-title {
+    color: var(--text-1);
+    font-size: 14px;
+    font-weight: 750;
+  }
+  .recommendation-detail,
+  .recommendation-meta {
+    color: var(--text-2);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .recommendation-meta {
+    white-space: nowrap;
+    font-weight: 650;
+  }
+  .recommendation-arrow {
+    color: var(--text-3);
+    font-size: 20px;
+  }
+
+  @media (max-width: 720px) {
+    .summary-hero {
+      flex-direction: column;
+    }
+    .summary-actions {
+      width: 100%;
+      min-width: 0;
+    }
+    .summary-metrics {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .dashboard {
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+    .dash-header {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .family-summary-card {
+      padding: 16px;
+    }
+    .empty-guidance,
+    .steady-state {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+    .guidance-action {
+      width: 100%;
+    }
+    .recommendation-row {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+    .recommendation-meta {
+      grid-column: 2 / 3;
+    }
+    .recommendation-arrow {
+      grid-column: 3 / 4;
+      grid-row: 1 / span 2;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spin {
+      animation: none;
+    }
+    .primary-action,
+    .secondary-action,
+    .guidance-action,
+    .recommendation-row {
+      transition: none;
+    }
   }
 </style>
