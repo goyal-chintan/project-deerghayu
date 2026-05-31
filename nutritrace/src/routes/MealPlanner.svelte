@@ -3,10 +3,12 @@
   import { fade, slide } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
   import { NtApi } from '../lib/api.js';
-  import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
+  import { NUTRIMENTS } from '../lib/nutrition.js';
+  import { summarizeFamilyNutrition, buildCoverageDistribution, getGoalTarget } from '../lib/familyNutrition.js';
   import { isAllowedInVegMode } from '../lib/dietType.js';
   import { generateGapSuggestions } from '../lib/nutrientRecommendations.js';
-  import { vegetarianMode } from '../stores/settings.js';
+  import { vegetarianMode, goals } from '../stores/settings.js';
+  import { currentUser } from '../stores/auth.js';
   import Sheet from '../components/ui/Sheet.svelte';
 
   // ── State ────────────────────────────────────────────────────────────────
@@ -255,10 +257,29 @@
     return agg;
   }
 
+  function getCurrentUserTargets(userGoals) {
+    const targets = {};
+    const currentMember = { isMe: true };
+    for (const id of TRACKED_NUTRIENTS) {
+      targets[id] = getGoalTarget(id, currentMember, userGoals);
+    }
+    return targets;
+  }
+
+  function getPlannerSuggestionTargets(memberList, userGoals) {
+    const targets = getAggregatedTargets(memberList);
+    const currentTargets = getCurrentUserTargets(userGoals);
+    for (const id of TRACKED_NUTRIENTS) {
+      targets[id] = (targets[id] || 0) + (currentTargets[id] || 0);
+    }
+    return targets;
+  }
+
   // NOTE: members is passed explicitly so Svelte tracks it as a reactive
   // dependency — referencing it only inside the function body would not
   // re-run this statement when family data loads (cards would stay empty).
   $: aggTargets = getAggregatedTargets(members);
+  $: plannerSuggestionTargets = getPlannerSuggestionTargets(members, $goals);
 
   // Compute planned nutrition for the day across all plans
   $: plannedNutrition = (() => {
@@ -301,28 +322,74 @@
     return result;
   })();
 
-  // Nutrient gap alerts
-  $: nutrientGaps = (() => {
-    const gaps = [];
-    for (const id of TRACKED_NUTRIENTS) {
-      const target = aggTargets[id] || 0;
-      if (target <= 0) continue;
-      const current = plannedNutrition[id] || 0;
-      const pct = Math.round((current / target) * 100);
-      if (pct < 80) {
-        const info = NUTRIMENTS.find(n => n.id === id);
-        gaps.push({ id, label: info?.label || id, pct, level: pct < 50 ? 'red' : 'yellow' });
+  function parseNutrition(nutrition) {
+    if (!nutrition) return {};
+    if (typeof nutrition === 'string') {
+      try {
+        return JSON.parse(nutrition) || {};
+      } catch {
+        return {};
       }
     }
-    return gaps;
-  })();
+    return nutrition;
+  }
+
+  function scaleNutritionForShare(nutrition, share) {
+    const scaled = {};
+    for (const [key, val] of Object.entries(parseNutrition(nutrition))) {
+      if (key === '_derived') continue;
+      scaled[key] = (parseFloat(val) || 0) * share;
+    }
+    return scaled;
+  }
+
+  function buildPlannerNutritionItems(planList, memberList) {
+    const family = memberList || [];
+    const participants = [{ id: 'me', isMe: true }, ...family];
+    return (planList || []).flatMap(plan => (plan.items || []).flatMap(item => {
+      const allocations = item.member_allocations || {};
+      const hasAllocations = Object.values(allocations).some(value => (parseFloat(value) || 0) > 0);
+      const allocatedFamilyShare = family.reduce((sum, member) => sum + (parseFloat(allocations[member.id]) || 0), 0);
+      const equalShare = 1 / participants.length;
+
+      return participants
+        .map(participant => {
+          const share = hasAllocations
+            ? participant.isMe
+              ? Math.max(0, 1 - allocatedFamilyShare)
+              : (parseFloat(allocations[participant.id]) || 0)
+            : equalShare;
+          if (share <= 0) return null;
+          return {
+            ...item,
+            meal: plan.meal_type || 'Meal',
+            member_id: participant.id,
+            quantity: 1,
+            nutrition: scaleNutritionForShare(item.nutrition, share)
+          };
+        })
+        .filter(Boolean);
+    }));
+  }
+
+  $: plannerNutritionItems = buildPlannerNutritionItems(plans, members);
+  $: plannerSummary = summarizeFamilyNutrition({
+    members,
+    currentUser: $currentUser,
+    goals: $goals,
+    items: plannerNutritionItems,
+    maxRecommendations: 3
+  });
+  $: coverageDistribution = buildCoverageDistribution(plannerSummary.analyticsRows);
+  $: planningRecommendations = plannerSummary.recommendations.slice(0, 3);
+  $: hasPlanningGaps = planningRecommendations.length > 0;
 
   // ── Gap Suggestions (reactive) ──────────────────────────────────────────
-  $: if (nutrientGaps.length > 0 && !foodsLoaded) loadFoodLibrary();
+  $: if (hasPlanningGaps && !foodsLoaded) loadFoodLibrary();
 
   $: gapSuggestions = (() => {
-    if (!foodsLoaded || nutrientGaps.length === 0) return [];
-    return generateGapSuggestions(plannedNutrition, aggTargets, allFoods, $vegetarianMode);
+    if (!foodsLoaded || !hasPlanningGaps) return [];
+    return generateGapSuggestions(plannedNutrition, plannerSuggestionTargets, allFoods, $vegetarianMode).slice(0, 3);
   })();
 
   let showGapSuggestions = false;
@@ -886,22 +953,61 @@
         {/if}
       </div>
 
-      <!-- ─── Nutrient Gap Alerts ─────────────────────────────────── -->
-      {#if nutrientGaps.length > 0}
-        <div class="card gap-card mb-3" transition:slide={{ duration: 200 }}>
-          <div class="gap-header">
-            <span class="material-symbols-rounded" style="font-size:18px; color:var(--warning)">warning</span>
-            <span>Nutrient Gaps</span>
+      <!-- ─── Planning Insights ───────────────────────────────────── -->
+      <div class="card planning-insights-card mb-3" transition:slide={{ duration: 200 }}>
+        <div class="pi-header">
+          <div class="pi-title-block">
+            <span class="pi-eyebrow">Planning insights</span>
+            <h3>{plannerSummary.headline}</h3>
+            <p>{plannerSummary.mealsLogged} meal{plannerSummary.mealsLogged === 1 ? '' : 's'} planned · {plannerSummary.bestNextAction}</p>
           </div>
-          <div class="gap-pills">
-            {#each nutrientGaps as gap}
-              <span class="gap-pill" class:red={gap.level === 'red'} class:yellow={gap.level === 'yellow'}>
-                {gap.level === 'red' ? '🔴' : '🟡'} {gap.label} ({gap.pct}%)
-              </span>
-            {/each}
+          <button class="analytics-action" on:click={() => push('/nutrients')} aria-label="View nutrition analytics">
+            View analytics
+          </button>
+        </div>
+
+        <div class="coverage-distribution" aria-label="Nutrient coverage distribution">
+          <div class="distribution-item needs">
+            <span class="di-count">{coverageDistribution.needs_attention}</span>
+            <span class="di-label">Needs attention</span>
+          </div>
+          <div class="distribution-item watch">
+            <span class="di-count">{coverageDistribution.watch}</span>
+            <span class="di-label">Watch</span>
+          </div>
+          <div class="distribution-item track">
+            <span class="di-count">{coverageDistribution.on_track}</span>
+            <span class="di-label">On track</span>
           </div>
         </div>
-      {/if}
+
+        {#if planningRecommendations.length > 0}
+          <div class="recommendation-list">
+            {#each planningRecommendations as recommendation, idx (recommendation.id)}
+              <div class="recommendation-row">
+                <div class="rec-rank">{idx + 1}</div>
+                <div class="rec-copy">
+                  <span class="rec-title">{recommendation.label}</span>
+                  <span class="rec-meta">{recommendation.status.label} · {recommendation.affectedLabel}</span>
+                  <p>{recommendation.foodMove}</p>
+                </div>
+                <button
+                  class="details-btn"
+                  on:click={() => push('/nutrients')}
+                  aria-label="View nutrition analytics details for {recommendation.label}"
+                >
+                  Details
+                </button>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="planning-empty">
+            <span class="material-symbols-rounded">check_circle</span>
+            <span>Open analytics for the full nutrient breakdown when you need more detail.</span>
+          </div>
+        {/if}
+      </div>
 
       <!-- ─── Gap Suggestions ─────────────────────────────────────── -->
       {#if gapSuggestions.length > 0}
@@ -909,7 +1015,7 @@
           <button class="suggestions-header" on:click={() => showGapSuggestions = !showGapSuggestions}>
             <span style="display:flex;align-items:center;gap:6px">
               <span style="font-size:16px">💡</span>
-              <span>Suggestions to fill gaps</span>
+              <span>Food ideas for top planning gaps</span>
             </span>
             <span class="material-symbols-rounded suggestions-chevron" class:open={showGapSuggestions}>expand_more</span>
           </button>
@@ -1329,19 +1435,143 @@
   .member-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
   .member-name { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--accent); }
 
-  /* ─── Gap alerts ─────────────────────────────────────────────── */
-  .gap-card { padding: 12px 16px; }
-  .gap-header {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 13px; font-weight: 600; margin-bottom: 8px;
+  /* ─── Planning Insights ──────────────────────────────────────── */
+  .planning-insights-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
   }
-  .gap-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-  .gap-pill {
-    font-size: 11px; padding: 3px 8px; border-radius: var(--radius-full);
-    background: var(--surface-2); color: var(--text-2);
+  .pi-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
   }
-  .gap-pill.red { background: rgba(244, 67, 54, 0.15); color: var(--danger); }
-  .gap-pill.yellow { background: rgba(255, 193, 7, 0.15); color: var(--warning); }
+  .pi-title-block { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .pi-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .pi-title-block h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-1);
+    line-height: 1.25;
+  }
+  .pi-title-block p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-2);
+    line-height: 1.4;
+  }
+  .analytics-action,
+  .details-btn {
+    min-height: 44px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform var(--dur-fast), border-color var(--dur-fast), background var(--dur-fast);
+  }
+  .analytics-action {
+    flex: 0 0 auto;
+    padding: 0 16px;
+    font-size: 12px;
+  }
+  .analytics-action:active,
+  .details-btn:active { transform: scale(0.97); }
+  .coverage-distribution {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .distribution-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+  .di-count {
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text-1);
+  }
+  .di-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-2);
+    line-height: 1.2;
+  }
+  .distribution-item.needs { border-color: var(--danger); }
+  .distribution-item.watch { border-color: var(--warning); }
+  .distribution-item.track { border-color: var(--success); }
+  .recommendation-list { display: flex; flex-direction: column; gap: 8px; }
+  .recommendation-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: var(--radius-lg);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+  .rec-rank {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-full);
+    background: var(--surface-3);
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .rec-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .rec-title { font-size: 13px; font-weight: 700; color: var(--text-1); }
+  .rec-meta { font-size: 11px; font-weight: 600; color: var(--text-3); }
+  .rec-copy p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--text-2);
+    line-height: 1.35;
+  }
+  .details-btn {
+    padding: 0 14px;
+    font-size: 12px;
+  }
+  .planning-empty {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .planning-empty .material-symbols-rounded { color: var(--success); font-size: 18px; }
+  @media (max-width: 520px) {
+    .pi-header { flex-direction: column; }
+    .analytics-action { width: 100%; }
+    .coverage-distribution { grid-template-columns: 1fr; }
+    .recommendation-row { grid-template-columns: auto minmax(0, 1fr); }
+    .details-btn { grid-column: 1 / -1; width: 100%; }
+  }
 
   /* ─── Gap Suggestions ────────────────────────────────────────── */
   .suggestions-card {
@@ -1353,7 +1583,7 @@
   }
   .suggestions-header {
     display: flex; align-items: center; justify-content: space-between;
-    width: 100%; padding: 12px 16px;
+    width: 100%; min-height: 48px; padding: 12px 16px;
     background: none; border: none; color: var(--text-1);
     font-size: 13px; font-weight: 600; cursor: pointer;
   }
@@ -1377,7 +1607,9 @@
   }
   .si-text { font-size: 12px; color: var(--text-1); }
   .si-add-btn {
-    font-size: 11px; font-weight: 600; padding: 3px 8px;
+    min-height: 44px;
+    min-width: 56px;
+    font-size: 11px; font-weight: 600; padding: 0 12px;
     border-radius: var(--radius-full); border: 1px solid var(--accent);
     background: rgba(79, 255, 176, 0.1); color: var(--accent);
     cursor: pointer; white-space: nowrap;
