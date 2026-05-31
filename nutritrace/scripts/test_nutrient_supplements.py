@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 from nutrition_normalize import (
     SUPPORTED_NUTRIENTS, normalize_record, make_meta, apply_supplements,
     load_supplements, match_supplement_rules, match_item_overrides,
+    invalidate_supplements_cache, _validate_supplements,
     STATUS_SOURCED, STATUS_DERIVED, STATUS_EXPLICIT_ZERO, STATUS_ESTIMATED,
     STATUS_MISSING,
 )
@@ -363,6 +364,244 @@ assert_eq(rec_sourced["nutrition"]["b12"], 0.50,
            "Sourced B12 preserved after supplement (not overwritten)")
 assert_eq(rec_sourced["nutrition_meta"]["b12"]["status"], STATUS_SOURCED,
            "Status remains sourced after supplement")
+
+# -----------------------------------------------------------------------
+print("\n[Test 10] Validation rejects bad positive override (no citation)")
+# -----------------------------------------------------------------------
+bad_data_no_citation = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "b12": {
+                "value": 1.5,
+                "status": "estimated",
+                "source_ref": "test_src",
+                "confidence": 0.7
+                # missing citation!
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_data_no_citation)
+    assert_true(False, "Should have raised ValueError for missing citation")
+except ValueError as e:
+    assert_true("citation" in str(e).lower(),
+                f"ValueError mentions citation: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 11] Validation rejects bad positive override (no confidence)")
+# -----------------------------------------------------------------------
+bad_data_no_conf = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "b12": {
+                "value": 1.5,
+                "status": "estimated",
+                "source_ref": "test_src",
+                "citation": "Some citation"
+                # missing confidence!
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_data_no_conf)
+    assert_true(False, "Should have raised ValueError for missing confidence")
+except ValueError as e:
+    assert_true("confidence" in str(e).lower(),
+                f"ValueError mentions confidence: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 12] Validation rejects undefined source_ref in rule")
+# -----------------------------------------------------------------------
+bad_data_bad_ref = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [
+        {"id": "bad_rule", "nutrient_id": "b12", "value": 0,
+         "status": "explicit_zero", "source_ref": "nonexistent_source",
+         "match": {}}
+    ],
+    "item_overrides": {},
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_data_bad_ref)
+    assert_true(False, "Should have raised ValueError for undefined source_ref")
+except ValueError as e:
+    assert_true("nonexistent_source" in str(e),
+                f"ValueError mentions bad source_ref: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 13] Validation rejects bad status on positive override")
+# -----------------------------------------------------------------------
+bad_data_bad_status = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "b12": {
+                "value": 1.5,
+                "status": "explicit_zero",  # Wrong for positive value!
+                "source_ref": "test_src",
+                "citation": "Some citation",
+                "confidence": 0.7
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_data_bad_status)
+    assert_true(False, "Should have raised ValueError for bad status on positive")
+except ValueError as e:
+    assert_true("status" in str(e).lower(),
+                f"ValueError mentions status: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 14] Recipe overrides: Afghani chicken gets positive B12")
+# -----------------------------------------------------------------------
+rec_afghani = make_test_record(
+    name="Afghani chicken", code="OSR062",
+    group="", diet_type="non-vegetarian",
+    source="INDB 2024.11",
+    nutrition={"calories": 200, "proteins": 18},
+)
+assert_true(rec_afghani["nutrition"]["b12"] > 0,
+            f"Afghani chicken B12 > 0 (got {rec_afghani['nutrition']['b12']})")
+assert_true(rec_afghani["nutrition_meta"]["b12"].get("citation") is not None,
+            "Afghani chicken B12 has citation")
+assert_true(rec_afghani["nutrition_meta"]["b12"].get("confidence") is not None,
+            "Afghani chicken B12 has confidence")
+
+# -----------------------------------------------------------------------
+print("\n[Test 15] Recipe overrides: Shrikhand gets positive B12")
+# -----------------------------------------------------------------------
+rec_shrikhand = make_test_record(
+    name="Sweetened yogurt (Shrikhand)", code="OSR024",
+    group="", diet_type="vegetarian",
+    source="INDB 2024.11",
+    nutrition={"calories": 180, "sugars": 20},
+)
+assert_true(rec_shrikhand["nutrition"]["b12"] > 0,
+            f"Shrikhand B12 > 0 (got {rec_shrikhand['nutrition']['b12']})")
+assert_true("yogurt" in (rec_shrikhand["nutrition_meta"]["b12"].get("citation") or "").lower()
+            or "curd" in (rec_shrikhand["nutrition_meta"]["b12"].get("citation") or "").lower(),
+            "Shrikhand citation mentions yogurt/curd source")
+
+# -----------------------------------------------------------------------
+print("\n[Test 16] IFCT overrides: Goat liver (O008) gets high B12")
+# -----------------------------------------------------------------------
+rec_goat_liver = make_test_record(
+    name="Goat, liver", code="O008",
+    group="Animal Meat", diet_type="non-vegetarian",
+    source="IFCT 2017",
+    nutrition={"calories": 135, "proteins": 19},
+)
+assert_true(rec_goat_liver["nutrition"]["b12"] > 30,
+            f"Goat liver B12 > 30 (got {rec_goat_liver['nutrition']['b12']})")
+assert_true(rec_goat_liver["nutrition_meta"]["b12"].get("citation") is not None,
+            "Goat liver B12 has citation")
+
+# -----------------------------------------------------------------------
+print("\n[Test 17] IFCT overrides: Chicken liver (N005) gets high B12")
+# -----------------------------------------------------------------------
+rec_chicken_liver = make_test_record(
+    name="Poultry, chicken, liver", code="N005",
+    group="Poultry", diet_type="non-vegetarian",
+    source="IFCT 2017",
+    nutrition={"calories": 119, "proteins": 16},
+)
+assert_true(rec_chicken_liver["nutrition"]["b12"] > 10,
+            f"Chicken liver B12 > 10 (got {rec_chicken_liver['nutrition']['b12']})")
+assert_eq(rec_chicken_liver["nutrition"]["b12"], 16.58,
+           "Chicken liver B12 = 16.58 (USDA)")
+
+# -----------------------------------------------------------------------
+print("\n[Test 18] IFCT overrides: Oyster (Q006) gets high B12")
+# -----------------------------------------------------------------------
+rec_oyster = make_test_record(
+    name="Oyster", code="Q006",
+    group="Marine Shellfish", diet_type="non-vegetarian",
+    source="IFCT 2017",
+    nutrition={"calories": 68, "proteins": 7},
+)
+assert_true(rec_oyster["nutrition"]["b12"] > 10,
+            f"Oyster B12 > 10 (got {rec_oyster['nutrition']['b12']})")
+assert_eq(rec_oyster["nutrition"]["b12"], 16.0, "Oyster B12 = 16.0 (USDA)")
+
+# -----------------------------------------------------------------------
+print("\n[Test 19] IFCT overrides: Clam green shell (R001) gets very high B12")
+# -----------------------------------------------------------------------
+rec_clam = make_test_record(
+    name="Clam, green shell", code="R001",
+    group="Marine Mollusks", diet_type="non-vegetarian",
+    source="IFCT 2017",
+    nutrition={"calories": 74, "proteins": 13},
+)
+assert_true(rec_clam["nutrition"]["b12"] > 50,
+            f"Clam B12 > 50 (got {rec_clam['nutrition']['b12']})")
+
+# -----------------------------------------------------------------------
+print("\n[Test 20] IFCT overrides: Goat shoulder (O001) gets moderate B12")
+# -----------------------------------------------------------------------
+rec_goat = make_test_record(
+    name="Goat, shoulder, meat", code="O001",
+    group="Animal Meat", diet_type="non-vegetarian",
+    source="IFCT 2017",
+    nutrition={"calories": 109, "proteins": 20},
+)
+assert_true(rec_goat["nutrition"]["b12"] > 0.5,
+            f"Goat shoulder B12 > 0.5 (got {rec_goat['nutrition']['b12']})")
+assert_eq(rec_goat["nutrition"]["b12"], 1.13, "Goat shoulder B12 = 1.13 (USDA)")
+
+# -----------------------------------------------------------------------
+print("\n[Test 21] Recipe override: Egg curry gets positive B12")
+# -----------------------------------------------------------------------
+rec_egg_curry = make_test_record(
+    name="Egg curry (Anda curry)", code="BFP240",
+    group="", diet_type="eggetarian",
+    source="INDB 2024.11",
+    nutrition={"calories": 150, "proteins": 8},
+)
+assert_true(rec_egg_curry["nutrition"]["b12"] > 0,
+            f"Egg curry B12 > 0 (got {rec_egg_curry['nutrition']['b12']})")
+
+# -----------------------------------------------------------------------
+print("\n[Test 22] Recipe override: Prawn curry gets positive B12")
+# -----------------------------------------------------------------------
+rec_prawn = make_test_record(
+    name="Prawn curry (with coconut) (Jhinga curry)", code="BFP230",
+    group="", diet_type="non-vegetarian",
+    source="INDB 2024.11",
+    nutrition={"calories": 130, "proteins": 10},
+)
+assert_true(rec_prawn["nutrition"]["b12"] > 0,
+            f"Prawn curry B12 > 0 (got {rec_prawn['nutrition']['b12']})")
+
+# -----------------------------------------------------------------------
+print("\n[Test 23] Existing supplement JSON passes full validation")
+# -----------------------------------------------------------------------
+invalidate_supplements_cache()
+try:
+    data = load_supplements()
+    assert_true(True, "Full supplement JSON passes validation on load")
+    assert_true(len(data["item_overrides"]) >= 60,
+                f"At least 60 item overrides (got {len(data['item_overrides'])})")
+    recipe_count = len([k for k in data["recipe_overrides"] if not k.startswith("_")])
+    assert_true(recipe_count >= 30,
+                f"At least 30 recipe overrides (got {recipe_count})")
+except ValueError as e:
+    assert_true(False, f"Supplement JSON validation failed: {e}")
 
 # -----------------------------------------------------------------------
 # Summary

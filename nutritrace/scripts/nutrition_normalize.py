@@ -161,9 +161,117 @@ def normalize_record(record, source_name, source_values, zero_rules=None, derive
 
 _supplements_cache = None
 
+# Valid statuses for positive-value overrides (value > 0)
+_POSITIVE_OVERRIDE_STATUSES = {"sourced", "estimated"}
+
+
+def _validate_supplements(data):
+    """Validate the supplement JSON structure on load.
+
+    Checks:
+    - All rules reference defined sources.
+    - All positive overrides (value > 0) have: source_ref referencing a defined
+      source, citation (non-empty string), confidence (numeric 0-1), non-negative
+      numeric value, and valid status ('sourced' or 'estimated').
+    - Zero overrides must have valid status ('explicit_zero').
+
+    Raises:
+        ValueError: with descriptive message on first validation failure.
+    """
+    defined_sources = set(data.get("sources", {}).keys())
+
+    # --- Validate rules ---
+    for i, rule in enumerate(data.get("rules", [])):
+        rule_id = rule.get("id", f"rules[{i}]")
+        source_ref = rule.get("source_ref")
+        if source_ref and source_ref not in defined_sources:
+            raise ValueError(
+                f"Rule '{rule_id}': source_ref '{source_ref}' not defined in sources. "
+                f"Defined: {sorted(defined_sources)}"
+            )
+        if "nutrient_id" not in rule:
+            raise ValueError(f"Rule '{rule_id}': missing required 'nutrient_id'.")
+        if "value" not in rule:
+            raise ValueError(f"Rule '{rule_id}': missing required 'value'.")
+        if not isinstance(rule["value"], (int, float)) or rule["value"] < 0:
+            raise ValueError(
+                f"Rule '{rule_id}': value must be a non-negative number, "
+                f"got {rule['value']!r}."
+            )
+
+    # --- Validate item_overrides and recipe_overrides ---
+    for section_name in ("item_overrides", "recipe_overrides"):
+        section = data.get(section_name, {})
+        for item_key, nutrients in section.items():
+            if item_key.startswith("_"):
+                continue  # Skip metadata keys
+            if not isinstance(nutrients, dict):
+                continue
+            for nid, override in nutrients.items():
+                if nid.startswith("_"):
+                    continue
+                if not isinstance(override, dict):
+                    continue
+
+                loc = f"{section_name}['{item_key}']['{nid}']"
+                value = override.get("value")
+
+                # Value must be numeric and non-negative
+                if not isinstance(value, (int, float)):
+                    raise ValueError(
+                        f"{loc}: 'value' must be numeric, got {type(value).__name__}."
+                    )
+                if value < 0:
+                    raise ValueError(f"{loc}: 'value' must be non-negative, got {value}.")
+
+                source_ref = override.get("source_ref")
+                if source_ref and source_ref not in defined_sources:
+                    raise ValueError(
+                        f"{loc}: source_ref '{source_ref}' not defined in sources. "
+                        f"Defined: {sorted(defined_sources)}"
+                    )
+
+                # Positive values require stricter validation
+                if value > 0:
+                    status = override.get("status")
+                    if status not in _POSITIVE_OVERRIDE_STATUSES:
+                        raise ValueError(
+                            f"{loc}: positive value ({value}) requires status in "
+                            f"{_POSITIVE_OVERRIDE_STATUSES}, got '{status}'."
+                        )
+                    if not source_ref:
+                        raise ValueError(
+                            f"{loc}: positive value ({value}) requires 'source_ref'."
+                        )
+                    citation = override.get("citation")
+                    if not citation or not isinstance(citation, str) or not citation.strip():
+                        raise ValueError(
+                            f"{loc}: positive value ({value}) requires non-empty "
+                            f"'citation' string."
+                        )
+                    confidence = override.get("confidence")
+                    if confidence is None:
+                        raise ValueError(
+                            f"{loc}: positive value ({value}) requires 'confidence' "
+                            f"(numeric 0-1)."
+                        )
+                    if not isinstance(confidence, (int, float)):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be numeric, "
+                            f"got {type(confidence).__name__}."
+                        )
+                    if not (0 <= confidence <= 1):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be 0-1, got {confidence}."
+                        )
+
 
 def load_supplements():
-    """Load and cache the nutrient-supplements.json data.
+    """Load, validate, and cache the nutrient-supplements.json data.
+
+    Validates JSON structure on first load. Raises ValueError if the data
+    fails validation checks (undefined source_refs, missing citations on
+    positive values, etc.).
 
     Returns:
         dict with keys: schema_version, sources, rules, item_overrides,
@@ -173,8 +281,16 @@ def load_supplements():
     if _supplements_cache is not None:
         return _supplements_cache
     with open(_SUPPLEMENTS_PATH, encoding="utf-8") as fh:
-        _supplements_cache = json.load(fh)
+        data = json.load(fh)
+    _validate_supplements(data)
+    _supplements_cache = data
     return _supplements_cache
+
+
+def invalidate_supplements_cache():
+    """Clear the cached supplements data (useful for testing)."""
+    global _supplements_cache
+    _supplements_cache = None
 
 
 def _name_matches_any_pattern(name, patterns):
