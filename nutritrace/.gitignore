@@ -27,6 +27,11 @@ Thumbs.db
 
 # Bind mount data (DB + uploads live on the host, not in git)
 data/
+# ...but the curated seed datasets (numeric facts + per-row provenance) are
+# reviewable source-of-truth and MUST be committed. Raw upstream downloads
+# under scripts/data/ stay ignored.
+!server/seed/data/
+!server/seed/data/**
 
 # Editor
 .vscode/
@@ -34,3 +39,8 @@ data/
 *.swp
 *.swo
 
+
+# Local SQLite runtime artifacts
+*.db
+*.db-shm
+*.db-wal

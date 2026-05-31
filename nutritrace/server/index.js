@@ -48,6 +48,43 @@ seedSmtpFromEnv();
 seedAiFromEnv();
 seedOidcFromEnv();
 
+// ── Auto-seed Indian nutrition data (IFCT foods + INDB recipes) ───────────
+// Idempotent: inserts on first run, updates thereafter. Seeds for the first
+// user found in the database so the group catalogue is always populated.
+import { seedFoods, seedRecipes } from './seed/seed-core.js';
+import { readFileSync } from 'node:fs';
+try {
+  const owner = db.prepare('SELECT id FROM users ORDER BY id LIMIT 1').get();
+  if (owner) {
+    const seedDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'seed', 'data');
+    const foods = JSON.parse(readFileSync(path.join(seedDir, 'ifct-foods.json'), 'utf-8'));
+    const recipes = JSON.parse(readFileSync(path.join(seedDir, 'indb-recipes.json'), 'utf-8'));
+    const fRes = seedFoods(db, owner.id, foods);
+    const rRes = seedRecipes(db, owner.id, recipes);
+    if (fRes.inserted || rRes.inserted) {
+      logger.info(`[seed] Indian nutrition data: ${fRes.inserted} foods + ${rRes.inserted} recipes inserted`);
+    }
+    if (fRes.updated || rRes.updated) {
+      logger.debug(`[seed] Updated: ${fRes.updated} foods, ${rRes.updated} recipes`);
+    }
+    if (fRes.skipped || rRes.skipped) {
+      logger.warn(`[seed] Skipped: ${fRes.skipped} foods, ${rRes.skipped} recipes (validation/conflict)`);
+    }
+    if (fRes.errors.length) {
+      logger.warn(`[seed] Food validation errors (${fRes.errors.length}):`, fRes.errors.slice(0, 3).join(' | '));
+    }
+    if (rRes.errors.length) {
+      logger.warn(`[seed] Recipe validation errors (${rRes.errors.length}):`, rRes.errors.slice(0, 3).join(' | '));
+    }
+    if (rRes.conflicts.length) {
+      const sample = rRes.conflicts.slice(0, 3).map(c => `${c.name} (${c.code})`).join(', ');
+      logger.warn(`[seed] Recipe conflicts (${rRes.conflicts.length}): ${sample}`);
+    }
+  }
+} catch (e) {
+  logger.error(`[seed] Auto-seed failed (startup continues): ${e.message}`);
+}
+
 const app  = express();
 const PORT = process.env.PORT || 3001;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

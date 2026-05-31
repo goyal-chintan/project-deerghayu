@@ -1,0 +1,655 @@
+#!/usr/bin/env python3
+"""
+nutrition_normalize.py — Canonical nutrient normalization helpers.
+
+Provides the SUPPORTED_NUTRIENTS list (matching src/lib/nutrition.js order),
+metadata constructors, and a record-level normalizer that ensures every seeded
+food/recipe has all supported nutrient keys with provenance tracking.
+
+Also provides the nutrient supplement framework: load_supplements(),
+match_supplement_rules(), apply_supplements() — for applying audited
+explicit-zero rules and cited B12/positive-value overrides from
+nutrient-supplements.json.
+
+Usage (by converter scripts):
+    from nutrition_normalize import (
+        SUPPORTED_NUTRIENTS, normalize_record, make_meta,
+        load_supplements, apply_supplements,
+    )
+
+Provenance status vocabulary:
+    sourced       — value provided by the data source
+    derived       — computed from other sourced/derived values
+    explicit_zero — set to 0 by a domain rule (nutrient not expected in category)
+    estimated     — cited value from external reference (not original source)
+    missing       — unresolved placeholder (value unknown)
+"""
+import json
+import math
+import os
+import re
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+_IDS_PATH = os.path.join(HERE, "..", "server", "seed", "data", "supported-nutrient-ids.json")
+_SUPPLEMENTS_PATH = os.path.join(HERE, "..", "server", "seed", "data", "nutrient-supplements.json")
+
+with open(_IDS_PATH, encoding="utf-8") as _fh:
+    SUPPORTED_NUTRIENTS = json.load(_fh)
+
+# --- Status constants ---
+STATUS_SOURCED = "sourced"
+STATUS_DERIVED = "derived"
+STATUS_EXPLICIT_ZERO = "explicit_zero"
+STATUS_ESTIMATED = "estimated"
+STATUS_MISSING = "missing"
+
+# --- Conversion constants (match nutrition.js) ---
+KCAL_TO_KJ = 4.184
+SODIUM_MG_PER_SALT_G = 400
+
+
+def _is_valid_numeric(value):
+    """Return True if value is a finite non-negative number (not bool)."""
+    if isinstance(value, bool):
+        return False
+    if not isinstance(value, (int, float)):
+        return False
+    if math.isnan(value) or math.isinf(value):
+        return False
+    return value >= 0
+
+
+def make_meta(status, source, citation=None, confidence=None):
+    """Create a provenance metadata dict for a single nutrient value.
+
+    Args:
+        status: one of STATUS_SOURCED, STATUS_DERIVED, STATUS_MISSING,
+                STATUS_EXPLICIT_ZERO.
+        source: short name of the data source (e.g. "IFCT 2017", "INDB").
+        citation: optional reference string.
+        confidence: optional float 0-1.
+
+    Returns:
+        dict with non-None fields only.
+    """
+    meta = {"status": status, "source": source}
+    if citation is not None:
+        meta["citation"] = citation
+    if confidence is not None:
+        meta["confidence"] = confidence
+    return meta
+
+
+def normalize_record(record, source_name, source_values, zero_rules=None, derived_rules=None):
+    """Build fully-populated nutrition and nutrition_meta from source_values.
+
+    Constructs fresh `nutrition` and `nutrition_meta` dicts covering every
+    supported nutrient ID, then assigns them to the record. Any pre-existing
+    `record['nutrition']` is replaced to guarantee completeness.
+
+    Args:
+        record: dict to populate (typically has name, group, etc.).
+        source_name: provenance label for sourced values (e.g. "IFCT 2017").
+        source_values: dict of nutrient_id -> numeric value from the source.
+        zero_rules: set/list of nutrient ids that should be explicit zero when
+                    not present in source_values (e.g. caffeine for most foods).
+        derived_rules: set/list of nutrient ids eligible for derivation.
+                       Currently supports 'kilojoules' and 'salt'.
+
+    Returns:
+        The record dict with record['nutrition'] fully populated and
+        record['nutrition_meta'] containing per-key provenance.
+
+    Derivation rules:
+        - kilojoules = calories * 4.184 (when calories key is valid numeric)
+        - salt = sodium_mg / 400 (when sodium key is valid numeric and salt
+          not already sourced)
+    """
+    if zero_rules is None:
+        zero_rules = set()
+    else:
+        zero_rules = set(zero_rules)
+
+    if derived_rules is None:
+        derived_rules = {"kilojoules", "salt"}
+    else:
+        derived_rules = set(derived_rules)
+
+    nutrition = {}
+    meta = {}
+
+    # Phase 1: Apply sourced values
+    for nid in SUPPORTED_NUTRIENTS:
+        if nid in source_values and source_values[nid] is not None:
+            val = source_values[nid]
+            if _is_valid_numeric(val):
+                nutrition[nid] = val
+                meta[nid] = make_meta(STATUS_SOURCED, source_name)
+
+    # Phase 2: Derive kilojoules from calories (any valid value incl. 0)
+    if "kilojoules" in derived_rules and "kilojoules" not in nutrition:
+        if "calories" in nutrition and _is_valid_numeric(nutrition["calories"]):
+            nutrition["kilojoules"] = round(nutrition["calories"] * KCAL_TO_KJ, 1)
+            meta["kilojoules"] = make_meta(STATUS_DERIVED, source_name,
+                                           citation="calories * 4.184")
+
+    # Phase 3: Derive salt from sodium (sodium in mg -> salt in g)
+    if "salt" in derived_rules and "salt" not in nutrition:
+        if "sodium" in nutrition and _is_valid_numeric(nutrition["sodium"]):
+            nutrition["salt"] = round(nutrition["sodium"] / SODIUM_MG_PER_SALT_G, 3)
+            meta["salt"] = make_meta(STATUS_DERIVED, source_name,
+                                     citation="sodium_mg / 400")
+
+    # Phase 4: Fill remaining gaps — every supported key gets a value + meta
+    for nid in SUPPORTED_NUTRIENTS:
+        if nid not in nutrition:
+            if nid in zero_rules:
+                nutrition[nid] = 0
+                meta[nid] = make_meta(STATUS_EXPLICIT_ZERO, source_name,
+                                      citation="not expected in food category")
+            else:
+                nutrition[nid] = 0
+                meta[nid] = make_meta(STATUS_MISSING, source_name)
+
+    # Assign fresh objects to record (replaces any pre-existing partial data)
+    record["nutrition"] = nutrition
+    record["nutrition_meta"] = meta
+    return record
+
+
+# ===========================================================================
+# Nutrient Supplement Framework
+# ===========================================================================
+
+_supplements_cache = None
+
+# Valid statuses for positive-value overrides (value > 0)
+_POSITIVE_OVERRIDE_STATUSES = {"sourced", "estimated"}
+# Valid basis values for overrides
+_VALID_BASIS = {"per_100g", "per_serving"}
+
+
+def _is_strict_numeric(value):
+    """Return True if value is a finite number (not bool)."""
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def _validate_supplements(data):
+    """Validate the supplement JSON structure on load.
+
+    Checks:
+    - All rules reference defined sources and have valid regex patterns.
+    - All positive overrides (value > 0) have: source_ref referencing a defined
+      source, citation (non-empty string), confidence (numeric 0-1), non-negative
+      numeric value, valid status ('sourced' or 'estimated'), and basis.
+    - Zero overrides must have status 'explicit_zero', defined source_ref, and
+      citation.
+    - Booleans are rejected for numeric fields (value, confidence).
+
+    Raises:
+        ValueError: with descriptive message on first validation failure.
+    """
+    defined_sources = set(data.get("sources", {}).keys())
+
+    # --- Validate rules ---
+    for i, rule in enumerate(data.get("rules", [])):
+        rule_id = rule.get("id", f"rules[{i}]")
+        source_ref = rule.get("source_ref")
+        if source_ref and source_ref not in defined_sources:
+            raise ValueError(
+                f"Rule '{rule_id}': source_ref '{source_ref}' not defined in sources. "
+                f"Defined: {sorted(defined_sources)}"
+            )
+        if not source_ref:
+            raise ValueError(f"Rule '{rule_id}': missing required 'source_ref'.")
+        if "nutrient_id" not in rule:
+            raise ValueError(f"Rule '{rule_id}': missing required 'nutrient_id'.")
+        if "value" not in rule:
+            raise ValueError(f"Rule '{rule_id}': missing required 'value'.")
+        rule_value = rule["value"]
+        if isinstance(rule_value, bool) or not isinstance(rule_value, (int, float)):
+            raise ValueError(
+                f"Rule '{rule_id}': value must be a non-negative number (not bool), "
+                f"got {rule_value!r}."
+            )
+        if rule_value < 0:
+            raise ValueError(
+                f"Rule '{rule_id}': value must be non-negative, got {rule_value}."
+            )
+
+        # Zero rules must have status explicit_zero and description
+        if rule_value == 0:
+            rule_status = rule.get("status")
+            if rule_status != STATUS_EXPLICIT_ZERO:
+                raise ValueError(
+                    f"Rule '{rule_id}': zero-value rule requires status "
+                    f"'explicit_zero', got '{rule_status}'."
+                )
+            rule_desc = rule.get("description")
+            if not rule_desc or not isinstance(rule_desc, str) or not rule_desc.strip():
+                raise ValueError(
+                    f"Rule '{rule_id}': zero-value rule requires non-empty "
+                    f"'description' for provenance."
+                )
+
+        # Validate regex patterns compile correctly
+        for pattern_key in ("exclude_name_patterns",):
+            patterns = rule.get(pattern_key, [])
+            for pi, pat in enumerate(patterns):
+                try:
+                    re.compile(pat)
+                except re.error as e:
+                    raise ValueError(
+                        f"Rule '{rule_id}': invalid regex in {pattern_key}[{pi}] "
+                        f"'{pat}': {e}"
+                    )
+
+    # --- Validate item_overrides and recipe_overrides ---
+    for section_name in ("item_overrides", "recipe_overrides"):
+        section = data.get(section_name, {})
+        for item_key, nutrients in section.items():
+            if item_key.startswith("_"):
+                continue  # Skip metadata keys
+            if not isinstance(nutrients, dict):
+                continue
+            for nid, override in nutrients.items():
+                if nid.startswith("_"):
+                    continue
+                if not isinstance(override, dict):
+                    continue
+
+                loc = f"{section_name}['{item_key}']['{nid}']"
+                value = override.get("value")
+
+                # Value must be numeric (not bool) and non-negative
+                if isinstance(value, bool):
+                    raise ValueError(
+                        f"{loc}: 'value' must be numeric (not bool), got {value!r}."
+                    )
+                if not isinstance(value, (int, float)):
+                    raise ValueError(
+                        f"{loc}: 'value' must be numeric, got {type(value).__name__}."
+                    )
+                if not math.isfinite(value):
+                    raise ValueError(
+                        f"{loc}: 'value' must be finite, got {value!r}."
+                    )
+                if value < 0:
+                    raise ValueError(f"{loc}: 'value' must be non-negative, got {value}.")
+
+                source_ref = override.get("source_ref")
+                if source_ref and source_ref not in defined_sources:
+                    raise ValueError(
+                        f"{loc}: source_ref '{source_ref}' not defined in sources. "
+                        f"Defined: {sorted(defined_sources)}"
+                    )
+
+                # Validate confidence if present (applies to all overrides)
+                confidence = override.get("confidence")
+                if confidence is not None:
+                    if isinstance(confidence, bool):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be numeric (not bool), "
+                            f"got {confidence!r}."
+                        )
+                    if not isinstance(confidence, (int, float)):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be numeric, "
+                            f"got {type(confidence).__name__}."
+                        )
+                    if not math.isfinite(confidence):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be finite, got {confidence!r}."
+                        )
+                    if not (0 <= confidence <= 1):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be 0-1, got {confidence}."
+                        )
+
+                # Positive values require stricter validation
+                if value > 0:
+                    status = override.get("status")
+                    if status not in _POSITIVE_OVERRIDE_STATUSES:
+                        raise ValueError(
+                            f"{loc}: positive value ({value}) requires status in "
+                            f"{_POSITIVE_OVERRIDE_STATUSES}, got '{status}'."
+                        )
+                    if not source_ref:
+                        raise ValueError(
+                            f"{loc}: positive value ({value}) requires 'source_ref'."
+                        )
+                    citation = override.get("citation")
+                    if not citation or not isinstance(citation, str) or not citation.strip():
+                        raise ValueError(
+                            f"{loc}: positive value ({value}) requires non-empty "
+                            f"'citation' string."
+                        )
+                    if confidence is None:
+                        raise ValueError(
+                            f"{loc}: positive value ({value}) requires 'confidence' "
+                            f"(numeric 0-1)."
+                        )
+                    # Basis is required for positive overrides
+                    basis = override.get("basis")
+                    if basis not in _VALID_BASIS:
+                        raise ValueError(
+                            f"{loc}: positive value requires 'basis' in "
+                            f"{_VALID_BASIS}, got '{basis}'."
+                        )
+
+                # Zero values require explicit_zero status and provenance
+                elif value == 0:
+                    status = override.get("status")
+                    if status != STATUS_EXPLICIT_ZERO:
+                        raise ValueError(
+                            f"{loc}: zero value requires status 'explicit_zero', "
+                            f"got '{status}'."
+                        )
+                    if not source_ref:
+                        raise ValueError(
+                            f"{loc}: zero override requires 'source_ref'."
+                        )
+                    citation = override.get("citation")
+                    if not citation or not isinstance(citation, str) or not citation.strip():
+                        raise ValueError(
+                            f"{loc}: zero override requires non-empty 'citation'."
+                        )
+
+
+def load_supplements():
+    """Load, validate, and cache the nutrient-supplements.json data.
+
+    Validates JSON structure on first load. Raises ValueError if the data
+    fails validation checks (undefined source_refs, missing citations on
+    positive values, etc.).
+
+    Returns:
+        dict with keys: schema_version, sources, rules, item_overrides,
+        recipe_overrides.
+    """
+    global _supplements_cache
+    if _supplements_cache is not None:
+        return _supplements_cache
+    with open(_SUPPLEMENTS_PATH, encoding="utf-8") as fh:
+        data = json.load(fh)
+    _validate_supplements(data)
+    _supplements_cache = data
+    return _supplements_cache
+
+
+def invalidate_supplements_cache():
+    """Clear the cached supplements data (useful for testing)."""
+    global _supplements_cache
+    _supplements_cache = None
+
+
+def _name_matches_any_pattern(name, patterns):
+    """Return True if the item name matches any regex pattern (case-insensitive).
+
+    Patterns use word-boundary anchors (\\b) to avoid substring false positives.
+    """
+    if not patterns:
+        return False
+    name_lower = name.lower()
+    for pattern in patterns:
+        if re.search(pattern, name_lower, re.IGNORECASE):
+            return True
+    return False
+
+
+def _rule_matches_item(rule, item_code, item_name, item_group, item_diet_type,
+                       item_source, item_nutrition=None):
+    """Check whether a supplement rule matches a given item.
+
+    Args:
+        rule: dict from supplements['rules'].
+        item_code: IFCT/INDB code (e.g. "C001").
+        item_name: item name string.
+        item_group: item group string (e.g. "Green Leafy Vegetables").
+        item_diet_type: one of "vegetarian", "eggetarian", "non-vegetarian".
+        item_source: data source string (e.g. "IFCT 2017", "INDB 2024.11").
+        item_nutrition: dict of already-resolved nutrition values (for
+                        requires_sourced checks).
+
+    Returns:
+        True if rule conditions are satisfied and item is not excluded.
+    """
+    match = rule.get("match", {})
+
+    # Check data_source constraint
+    ds = match.get("data_source")
+    if ds is not None:
+        if isinstance(ds, str):
+            if item_source != ds:
+                return False
+        elif isinstance(ds, list):
+            if item_source not in ds:
+                return False
+
+    # Check diet_type constraint
+    dt = match.get("diet_type")
+    if dt is not None:
+        if isinstance(dt, str):
+            if item_diet_type != dt:
+                return False
+        elif isinstance(dt, list):
+            if item_diet_type not in dt:
+                return False
+
+    # Check groups_include constraint
+    groups = match.get("groups_include")
+    if groups is not None:
+        if item_group not in groups:
+            return False
+
+    # Check requires_sourced constraint (nutrition keys that must have sourced values)
+    req_sourced = match.get("requires_sourced")
+    if req_sourced is not None and item_nutrition is not None:
+        for req_nid in req_sourced:
+            if req_nid not in item_nutrition or item_nutrition[req_nid] is None:
+                return False
+
+    # Check item exclusions
+    exclude_items = rule.get("exclude_items", [])
+    if item_code in exclude_items:
+        return False
+
+    # Check name-based exclusions (item should NOT match exclusion patterns)
+    exclude_patterns = rule.get("exclude_name_patterns", [])
+    if exclude_patterns and _name_matches_any_pattern(item_name, exclude_patterns):
+        return False
+
+    return True
+
+
+def match_supplement_rules(item_code, item_name, item_group, item_diet_type,
+                           item_source, item_nutrition=None):
+    """Find all supplement rules that match an item and return per-nutrient results.
+
+    Args:
+        item_code: e.g. "C001".
+        item_name: e.g. "Agathi leaves".
+        item_group: e.g. "Green Leafy Vegetables".
+        item_diet_type: e.g. "vegetarian".
+        item_source: e.g. "IFCT 2017".
+        item_nutrition: dict of sourced nutrition values (optional, for
+                        requires_sourced checks).
+
+    Returns:
+        dict of nutrient_id -> {value, status, source_ref, citation?, ...}
+        Only nutrients with matched rules are included.
+    """
+    supplements = load_supplements()
+    results = {}
+
+    for rule in supplements.get("rules", []):
+        nid = rule["nutrient_id"]
+        # Skip if already matched by a previous (higher-priority) rule
+        if nid in results:
+            continue
+        if _rule_matches_item(rule, item_code, item_name, item_group,
+                              item_diet_type, item_source, item_nutrition):
+            source_ref = rule.get("source_ref", "supplement_rule")
+            source_name = supplements["sources"].get(source_ref, {}).get("name", source_ref)
+            results[nid] = {
+                "value": rule["value"],
+                "status": rule["status"],
+                "source": source_name,
+                "citation": rule.get("description", ""),
+                "rule_id": rule["id"],
+            }
+
+    return results
+
+
+def match_item_overrides(item_code, item_source):
+    """Look up item-specific nutrient overrides by prefixed code.
+
+    Args:
+        item_code: e.g. "C001", "L002".
+        item_source: e.g. "IFCT 2017", "INDB 2024.11".
+
+    Returns:
+        dict of nutrient_id -> {value, status, source, citation, confidence?}
+        Empty dict if no override exists for this item.
+    """
+    supplements = load_supplements()
+
+    # Determine prefix from source
+    if "IFCT" in item_source:
+        prefix = "ifct"
+    elif "INDB" in item_source:
+        prefix = "indb"
+    else:
+        return {}
+
+    key = f"{prefix}:{item_code}"
+
+    # Check item_overrides
+    overrides_section = supplements.get("item_overrides", {})
+    item_data = overrides_section.get(key, {})
+
+    # Also check recipe_overrides for INDB items
+    if prefix == "indb":
+        recipe_section = supplements.get("recipe_overrides", {})
+        recipe_data = recipe_section.get(key, {})
+        # Merge: item_overrides take precedence
+        merged = {**recipe_data, **item_data}
+        item_data = merged
+
+    results = {}
+    for nid, override in item_data.items():
+        if nid.startswith("_"):
+            continue  # Skip metadata keys like _notes
+        if not isinstance(override, dict):
+            continue
+        source_ref = override.get("source_ref", "supplement_override")
+        source_name = supplements["sources"].get(source_ref, {}).get("name", source_ref)
+        results[nid] = {
+            "value": override["value"],
+            "status": override.get("status", STATUS_ESTIMATED),
+            "source": source_name,
+            "citation": override.get("citation"),
+            "confidence": override.get("confidence"),
+            "basis": override.get("basis"),
+        }
+
+    return results
+
+
+def apply_supplements(record, item_code, item_name, item_group, item_diet_type,
+                      item_source):
+    """Apply supplement rules and item overrides to a record's nutrition/meta.
+
+    This should be called AFTER normalize_record() has populated the full
+    nutrition dict. It upgrades 'missing' entries to 'explicit_zero' or
+    'estimated' values where supplement data is available. It does NOT
+    overwrite 'sourced' or 'derived' values from the primary data source.
+
+    Args:
+        record: dict with record['nutrition'] and record['nutrition_meta'] already
+                set by normalize_record().
+        item_code: item code (e.g. "C001").
+        item_name: item name.
+        item_group: item group.
+        item_diet_type: diet type.
+        item_source: data source string.
+
+    Returns:
+        The record dict with supplement values applied. Records which nutrients
+        were supplemented in record['nutrition_meta'].
+    """
+    nutrition = record.get("nutrition", {})
+    meta = record.get("nutrition_meta", {})
+
+    # Gather current sourced nutrition for requires_sourced checks
+    sourced_nutrition = {}
+    for nid, m in meta.items():
+        if m.get("status") == STATUS_SOURCED:
+            sourced_nutrition[nid] = nutrition.get(nid)
+
+    # Phase 1: Apply category-level rules (explicit zeros)
+    rule_results = match_supplement_rules(
+        item_code, item_name, item_group, item_diet_type, item_source,
+        item_nutrition=sourced_nutrition,
+    )
+    for nid, result in rule_results.items():
+        current_status = meta.get(nid, {}).get("status")
+        # Only apply to 'missing' entries — never overwrite sourced/derived
+        if current_status == STATUS_MISSING:
+            nutrition[nid] = result["value"]
+            meta[nid] = make_meta(
+                result["status"], result["source"],
+                citation=result.get("citation"),
+            )
+
+    # Phase 2: Apply item-specific overrides (positive values / estimates)
+    override_results = match_item_overrides(item_code, item_source)
+    is_indb = "INDB" in item_source
+    for nid, result in override_results.items():
+        current_status = meta.get(nid, {}).get("status")
+        # Override applies to 'missing' or 'explicit_zero' (positive data
+        # is more informative than a category-level zero rule)
+        if current_status in (STATUS_MISSING, STATUS_EXPLICIT_ZERO):
+            value = result["value"]
+            basis = result.get("basis")
+
+            # Scale per_100g INDB recipe overrides to per-serving
+            if is_indb and basis == "per_100g" and value > 0:
+                serving_grams = record.get("serving_grams")
+                if isinstance(serving_grams, bool):
+                    raise ValueError(
+                        f"Cannot apply per_100g override for '{nid}' on INDB item "
+                        f"'{item_code}': serving_grams is boolean ({serving_grams!r})."
+                    )
+                if serving_grams is None or not isinstance(serving_grams, (int, float)):
+                    raise ValueError(
+                        f"Cannot apply per_100g override for '{nid}' on INDB item "
+                        f"'{item_code}': serving_grams is missing or non-numeric "
+                        f"({serving_grams!r})."
+                    )
+                if not math.isfinite(serving_grams) or serving_grams <= 0:
+                    raise ValueError(
+                        f"Cannot apply per_100g override for '{nid}' on INDB item "
+                        f"'{item_code}': serving_grams must be >0, "
+                        f"got {serving_grams!r}."
+                    )
+                value = round(value * serving_grams / 100, 4)
+
+            nutrition[nid] = value
+            meta_entry = make_meta(
+                result["status"], result["source"],
+                citation=result.get("citation"),
+                confidence=result.get("confidence"),
+            )
+            # Retain basis and original_value for traceability on scaled values
+            if is_indb and basis == "per_100g" and result["value"] > 0:
+                meta_entry["basis"] = basis
+                meta_entry["original_value_per_100g"] = result["value"]
+            meta[nid] = meta_entry
+
+    record["nutrition"] = nutrition
+    record["nutrition_meta"] = meta
+    return record
