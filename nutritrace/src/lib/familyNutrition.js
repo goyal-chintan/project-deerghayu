@@ -133,6 +133,24 @@ export function summarizeFamilyNutrition({
   const memberSummaries = [];
   const analyticsRows = [];
 
+  if (mealsLogged === 0) {
+    return {
+      dataState: 'no_meals',
+      headline: 'Log a meal to analyze nutrition',
+      mealsLogged,
+      overallCoverage: 0,
+      bestNextAction: 'Log first meal',
+      members: people.map(member => ({
+        id: member.id,
+        name: formatMemberName(member, currentUser),
+        rows: [],
+        needsAttentionCount: 0,
+      })),
+      analyticsRows: [],
+      recommendations: [],
+    };
+  }
+
   for (const member of people) {
     const rows = [];
     for (const id of ANALYTICS_NUTRIENT_IDS) {

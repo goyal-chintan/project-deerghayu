@@ -102,8 +102,13 @@ test('summarizeFamilyNutrition distinguishes no meals from alarming deficits', (
   assert.equal(summary.recommendations.length, 0);
   assert.equal(summary.headline, 'Log a meal to analyze nutrition');
   assert.equal(summary.bestNextAction, 'Log first meal');
-  assert.ok(summary.analyticsRows.length > 0);
-  assert.ok(summary.analyticsRows.every(row => row.status.key === 'needs_attention'));
+  assert.equal(summary.analyticsRows.length, 0);
+  assert.deepEqual(buildCoverageDistribution(summary.analyticsRows), {
+    needs_attention: 0,
+    watch: 0,
+    on_track: 0,
+  });
+  assert.ok(summary.members.every(member => member.needsAttentionCount === 0));
 
   const noFamilySummary = summarizeFamilyNutrition({
     members: [],
