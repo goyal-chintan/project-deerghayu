@@ -84,23 +84,33 @@ def main():
         nutrition = {}
         # Energy: enerc is stored in kJ (representations/index.csv) -> kcal.
         e = num(r.get("enerc"))
-        if e and e > 0:
+        if e is not None and e >= 0:
             nutrition["calories"] = round(e / 4.184, 2)
         # Convert each mapped column from stored grams to the app's unit, then
         # round. Rounding AFTER scaling preserves µg-scale vitamins that would
         # otherwise vanish (e.g. 0.0001 g folate = 100 µg, not 0.000).
+        # Source zeros are preserved as sourced (finite nonneg); only
+        # blank/null/NaN are omitted (become status: missing after normalize).
         for code, (key, mult) in CODE_MAP.items():
             v = num(r.get(code))
-            if v is not None and v > 0:
+            if v is not None and v >= 0:
                 nutrition[key] = round(v * mult, 3)
         # Vitamin D = D2 (ergcal) + D3 (chocal), stored grams -> µg.
-        vd = (num(r.get("ergcal")) or 0) + (num(r.get("chocal")) or 0)
-        if vd > 0:
-            nutrition["vitamin-d"] = round(vd * UG, 3)
+        # Preserve the sum (including zero) when at least one component is
+        # explicitly present in the source (non-None).
+        d2 = num(r.get("ergcal"))
+        d3 = num(r.get("chocal"))
+        if d2 is not None or d3 is not None:
+            vd = (d2 or 0) + (d3 or 0)
+            if vd >= 0:
+                nutrition["vitamin-d"] = round(vd * UG, 3)
         # Vitamin K = K1 + K2, stored grams -> µg.
-        vk = (num(r.get("vitk1")) or 0) + (num(r.get("vitk2")) or 0)
-        if vk > 0:
-            nutrition["vitamin-k"] = round(vk * UG, 3)
+        k1 = num(r.get("vitk1"))
+        k2 = num(r.get("vitk2"))
+        if k1 is not None or k2 is not None:
+            vk = (k1 or 0) + (k2 or 0)
+            if vk >= 0:
+                nutrition["vitamin-k"] = round(vk * UG, 3)
         # Fatty-acid consistency guard. IFCT assays individual fatty acids
         # separately from crude "total fat" (fatce), so for some lean or
         # trace-fat foods (lean fish plus a few low-fat vegetables/fruits) the

@@ -146,9 +146,11 @@ describe('seed-core integration', () => {
       assert.equal(result, null);
     });
 
-    it('accepts negative numbers (valid finite)', () => {
+    it('rejects negative numbers', () => {
       const result = validateNutrition(completeNutrition({ calories: -1 }), 'test');
-      assert.equal(result, null);
+      assert.ok(result);
+      assert.match(result, /invalid values:/);
+      assert.match(result, /calories/);
     });
 
     it('rejects missing keys', () => {

@@ -35,8 +35,8 @@ const INDB_PROVENANCE_RE = /INDB 2024\.11, code \S+/;
 
 /**
  * Validate that a nutrition object contains exactly the supported nutrient keys,
- * and that every value is a finite number (rejects null, undefined, NaN, Infinity,
- * booleans, strings, objects).
+ * and that every value is a finite non-negative number (rejects null, undefined,
+ * NaN, Infinity, booleans, strings, objects, and negative numbers).
  *
  * Returns null if valid, or an error string describing the problem.
  *
@@ -52,7 +52,7 @@ export function validateNutrition(nutrition, label) {
   const missing = SUPPORTED_NUTRIENT_IDS.filter(id => !(id in nutrition));
   const extra = keys.filter(k => !SUPPORTED_SET.has(k));
   const invalid = SUPPORTED_NUTRIENT_IDS.filter(id =>
-    id in nutrition && (typeof nutrition[id] !== 'number' || !Number.isFinite(nutrition[id]))
+    id in nutrition && (typeof nutrition[id] !== 'number' || !Number.isFinite(nutrition[id]) || nutrition[id] < 0)
   );
 
   if (missing.length || extra.length || invalid.length) {

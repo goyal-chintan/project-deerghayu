@@ -415,6 +415,109 @@ if result is not None:
               "Normal sodium not flagged (200 mg/100g < 2000 threshold)")
 
 # -----------------------------------------------------------------------
+# Test 18: is_bad_number rejects booleans
+# -----------------------------------------------------------------------
+print("\n[Test 18] is_bad_number rejects booleans")
+
+assert_eq(vd.is_bad_number(True), True, "is_bad_number(True) = True")
+assert_eq(vd.is_bad_number(False), True, "is_bad_number(False) = True")
+assert_eq(vd.is_bad_number(0), False, "is_bad_number(0) = False (int zero is valid)")
+assert_eq(vd.is_bad_number(1), False, "is_bad_number(1) = False")
+assert_eq(vd.is_bad_number(3.14), False, "is_bad_number(3.14) = False")
+assert_eq(vd.is_bad_number(-1), True, "is_bad_number(-1) = True (negative)")
+assert_eq(vd.is_bad_number(float('nan')), True, "is_bad_number(NaN) = True")
+assert_eq(vd.is_bad_number(float('inf')), True, "is_bad_number(inf) = True")
+assert_eq(vd.is_bad_number("5"), True, "is_bad_number('5') = True")
+assert_eq(vd.is_bad_number(None), True, "is_bad_number(None) = True")
+
+# -----------------------------------------------------------------------
+# Test 19: check_structure rejects bool nutrient values
+# -----------------------------------------------------------------------
+print("\n[Test 19] check_structure rejects bool nutrient values")
+
+items_bool_nut = [
+    {"name": "Bool item", "code": "X1",
+     "nutrition": {"calories": True, "fat": False, "proteins": 10}},
+]
+result = assert_no_crash(vd.check_structure, items_bool_nut, "test",
+                         msg="check_structure handles bool values")
+if result is not None:
+    assert_true(any("bad value" in f for f in result),
+                "Detects bool as bad value")
+
+# -----------------------------------------------------------------------
+# Test 20: B12 provenance requires status sourced/estimated
+# -----------------------------------------------------------------------
+print("\n[Test 20] B12 provenance requires status sourced/estimated")
+
+items_b12_bad_status = [
+    {"name": "Bad B12 status", "nutrition": {"b12": 1.5},
+     "nutrition_meta": {"b12": {"status": "explicit_zero", "source": "X",
+                                "citation": "Y", "confidence": 0.5}}},
+]
+result = assert_no_crash(vd.check_b12_provenance, items_b12_bad_status, "test",
+                         msg="check_b12_provenance rejects bad status")
+if result is not None:
+    assert_true(len(result) > 0, "Yields hard issue for bad B12 status")
+    assert_true(any("status" in f for f in result),
+                "Hard issue mentions status")
+
+# -----------------------------------------------------------------------
+# Test 21: B12 provenance requires non-empty string citation
+# -----------------------------------------------------------------------
+print("\n[Test 21] B12 provenance requires non-empty string citation")
+
+items_b12_empty_citation = [
+    {"name": "Empty citation", "nutrition": {"b12": 0.5},
+     "nutrition_meta": {"b12": {"status": "estimated", "source": "USDA",
+                                "citation": "", "confidence": 0.5}}},
+]
+result = assert_no_crash(vd.check_b12_provenance, items_b12_empty_citation, "test",
+                         msg="check_b12_provenance rejects empty citation")
+if result is not None:
+    assert_true(len(result) > 0, "Yields hard issue for empty citation")
+
+# -----------------------------------------------------------------------
+# Test 22: B12 provenance requires numeric confidence in [0,1]
+# -----------------------------------------------------------------------
+print("\n[Test 22] B12 provenance requires numeric confidence in [0,1]")
+
+items_b12_bad_conf = [
+    {"name": "Bool conf", "nutrition": {"b12": 0.5},
+     "nutrition_meta": {"b12": {"status": "sourced", "source": "USDA",
+                                "citation": "test", "confidence": True}}},
+]
+result = assert_no_crash(vd.check_b12_provenance, items_b12_bad_conf, "test",
+                         msg="check_b12_provenance rejects bool confidence")
+if result is not None:
+    assert_true(len(result) > 0, "Yields hard issue for bool confidence")
+
+items_b12_high_conf = [
+    {"name": "High conf", "nutrition": {"b12": 0.5},
+     "nutrition_meta": {"b12": {"status": "sourced", "source": "USDA",
+                                "citation": "test", "confidence": 1.5}}},
+]
+result = assert_no_crash(vd.check_b12_provenance, items_b12_high_conf, "test",
+                         msg="check_b12_provenance rejects confidence > 1")
+if result is not None:
+    assert_true(len(result) > 0, "Yields hard issue for confidence > 1")
+
+# -----------------------------------------------------------------------
+# Test 23: B12 provenance passes for correct data
+# -----------------------------------------------------------------------
+print("\n[Test 23] B12 provenance passes for correct data")
+
+items_b12_good = [
+    {"name": "Good B12", "nutrition": {"b12": 0.45},
+     "nutrition_meta": {"b12": {"status": "sourced", "source": "USDA SR",
+                                "citation": "USDA FDC #01077", "confidence": 0.9}}},
+]
+result = assert_no_crash(vd.check_b12_provenance, items_b12_good, "test",
+                         msg="check_b12_provenance passes for valid data")
+if result is not None:
+    assert_eq(result, [], "No issues for valid B12 provenance")
+
+# -----------------------------------------------------------------------
 # Summary
 # -----------------------------------------------------------------------
 print(f"\n{'='*60}")

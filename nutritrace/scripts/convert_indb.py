@@ -132,16 +132,24 @@ def main():
         if not name:
             continue
         nutrition = {}
+        # Source zeros are preserved as sourced; only blank/null/NaN are
+        # omitted (become status: missing after normalize).
         for col, (key, mult) in SERVING_MAP.items():
             v = cell(row, col)
-            if v is not None and v > 0:
+            if v is not None and v >= 0:
                 nutrition[key] = round(v * mult, 3)
-        vd = sum(cell(row, c) or 0 for c in VITD_COLS)
-        if vd > 0:
-            nutrition["vitamin-d"] = round(vd, 3)
-        vk = sum(cell(row, c) or 0 for c in VITK_COLS)
-        if vk > 0:
-            nutrition["vitamin-k"] = round(vk, 3)
+        # Vitamin D: preserve sum (incl. zero) if at least one component present.
+        vd_parts = [cell(row, c) for c in VITD_COLS]
+        if any(p is not None for p in vd_parts):
+            vd = sum(p or 0 for p in vd_parts)
+            if vd >= 0:
+                nutrition["vitamin-d"] = round(vd, 3)
+        # Vitamin K: same logic.
+        vk_parts = [cell(row, c) for c in VITK_COLS]
+        if any(p is not None for p in vk_parts):
+            vk = sum(p or 0 for p in vk_parts)
+            if vk >= 0:
+                nutrition["vitamin-k"] = round(vk, 3)
 
         # Back-compute the serving weight (g) from the per-serving vs per-100g
         # energy ratio so the app can show "1 <unit> (~Ng)".
@@ -155,14 +163,18 @@ def main():
             # Fall back to per-100g for serving-less condiment rows.
             for col, (key, mult) in PER100_MAP.items():
                 v = cell(row, col)
-                if v is not None and v > 0:
+                if v is not None and v >= 0:
                     nutrition[key] = round(v * mult, 3)
-            vd = sum(cell(row, c) or 0 for c in VITD_COLS_100)
-            if vd > 0:
-                nutrition["vitamin-d"] = round(vd, 3)
-            vk = sum(cell(row, c) or 0 for c in VITK_COLS_100)
-            if vk > 0:
-                nutrition["vitamin-k"] = round(vk, 3)
+            vd_parts = [cell(row, c) for c in VITD_COLS_100]
+            if any(p is not None for p in vd_parts):
+                vd = sum(p or 0 for p in vd_parts)
+                if vd >= 0:
+                    nutrition["vitamin-d"] = round(vd, 3)
+            vk_parts = [cell(row, c) for c in VITK_COLS_100]
+            if any(p is not None for p in vk_parts):
+                vk = sum(p or 0 for p in vk_parts)
+                if vk >= 0:
+                    nutrition["vitamin-k"] = round(vk, 3)
             serving_unit = "100 g"
             serving_g = 100.0
             basis = "per_100g"

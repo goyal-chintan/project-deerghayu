@@ -60,6 +60,8 @@ def load(path):
 
 
 def is_bad_number(v):
+    if isinstance(v, bool):
+        return True
     return (not isinstance(v, (int, float))) or (not math.isfinite(v)) or v < 0
 
 
@@ -151,6 +153,9 @@ def check_status_vocabulary(items, kind):
 
 def check_b12_provenance(items, kind):
     """HARD: B12-positive values must have source + citation + confidence.
+    Additionally: status must be 'sourced' or 'estimated', source and citation
+    must be non-empty strings, confidence must be a finite non-bool numeric
+    value in [0, 1].
     Guards against non-dict nutrition/nutrition_meta/meta entries."""
     fails = []
     for i, o in enumerate(items):
@@ -158,7 +163,7 @@ def check_b12_provenance(items, kind):
         if not isinstance(nut, dict):
             continue  # already caught by completeness check
         b12_val = nut.get("b12", 0)
-        if not isinstance(b12_val, (int, float)) or b12_val <= 0:
+        if not isinstance(b12_val, (int, float)) or isinstance(b12_val, bool) or b12_val <= 0:
             continue
         tag = f"{kind}[{i}] {o.get('name','?')!r}"
         meta_root = o.get("nutrition_meta")
@@ -170,12 +175,30 @@ def check_b12_provenance(items, kind):
             fails.append(f"{tag}: B12={b12_val} but nutrition_meta.b12 is not a dict")
             continue
         missing_fields = []
-        if not meta.get("source"):
+        # Status must be sourced or estimated
+        status = meta.get("status")
+        if status not in ("sourced", "estimated"):
+            missing_fields.append(f"status (got {status!r}, need sourced/estimated)")
+        # Source must be non-empty string
+        source = meta.get("source")
+        if not source or not isinstance(source, str) or not source.strip():
             missing_fields.append("source")
-        if not meta.get("citation"):
+        # Citation must be non-empty string
+        citation = meta.get("citation")
+        if not citation or not isinstance(citation, str) or not citation.strip():
             missing_fields.append("citation")
-        if meta.get("confidence") is None:
+        # Confidence must be finite non-bool numeric in [0, 1]
+        confidence = meta.get("confidence")
+        if confidence is None:
             missing_fields.append("confidence")
+        elif isinstance(confidence, bool):
+            missing_fields.append("confidence (got bool)")
+        elif not isinstance(confidence, (int, float)):
+            missing_fields.append(f"confidence (got {type(confidence).__name__})")
+        elif not math.isfinite(confidence):
+            missing_fields.append("confidence (not finite)")
+        elif not (0 <= confidence <= 1):
+            missing_fields.append(f"confidence (got {confidence}, need 0-1)")
         if missing_fields:
             fails.append(f"{tag}: B12={b12_val} lacks {missing_fields}")
     return fails

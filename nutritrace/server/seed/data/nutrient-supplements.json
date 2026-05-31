@@ -1026,32 +1026,34 @@
     "_notes": "INDB recipes have no ingredient lists, so exact B12 computation is impossible. Overrides are applied only to clearly named categories. Confidence reflects naming-only inference. Values estimated using USDA FNDDS prepared-dish proxies and ingredient-proportion reasoning.",
     "indb:ASC001": {
       "b12": {
-        "value": 0,
-        "status": "explicit_zero",
-        "source_ref": "domain_b12_plant",
-        "confidence": 0.9,
-        "citation": "Hot tea (Garam Chai) — tea infusion has zero B12. Even with milk addition, B12 contribution per serving is negligible at beverage dilution.",
-        "notes": "Tea with milk might have trace B12 from milk but at typical dilution (10-20ml milk in 150ml tea) it rounds to 0 per 100g of prepared beverage.",
+        "value": 0.05,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.4,
+        "citation": "Hot tea (Garam Chai) — INDB shows fat=0.53g, protein=0.39g, calcium=14.2mg per 100g, consistent with ~12% whole milk by weight. Milk B12 ≈ 0.45 µg/100g (USDA SR 01077). Estimated B12 contribution: 0.12 × 0.45 ≈ 0.05 µg/100g prepared beverage.",
+        "notes": "Conservative lower-bound; actual milk proportion may be higher in Indian masala chai.",
         "basis": "per_100g"
       }
     },
     "indb:ASC002": {
       "b12": {
-        "value": 0,
-        "status": "explicit_zero",
-        "source_ref": "domain_b12_plant",
-        "confidence": 0.95,
-        "citation": "Instant coffee — coffee infusion has zero B12. Black coffee or coffee with minor milk addition contributes negligible B12 per 100g beverage.",
+        "value": 0.08,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.4,
+        "citation": "Instant coffee with milk — INDB shows fat=0.75g, protein=0.64g, calcium=20.9mg per 100g, consistent with ~17% whole milk by weight. Milk B12 ≈ 0.45 µg/100g (USDA SR 01077). Estimated B12: 0.17 × 0.45 ≈ 0.08 µg/100g prepared.",
+        "notes": "Indian instant coffee is typically prepared with significant milk (not black).",
         "basis": "per_100g"
       }
     },
     "indb:ASC003": {
       "b12": {
-        "value": 0,
-        "status": "explicit_zero",
-        "source_ref": "domain_b12_plant",
-        "confidence": 0.95,
-        "citation": "Espresso coffee — zero B12. Coffee beans contain no cobalamin.",
+        "value": 0.2,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.45,
+        "citation": "Espresso coffee (likely latte-style) — INDB shows fat=2.14g, protein=1.75g, calcium=58.1mg per 100g, consistent with ~48% whole milk by weight. Milk B12 ≈ 0.45 µg/100g (USDA SR 01077). Estimated B12: 0.48 × 0.45 ≈ 0.2 µg/100g prepared.",
+        "notes": "High calcium/fat/protein indicates substantial milk; despite 'espresso' name this is a milk-based coffee preparation.",
         "basis": "per_100g"
       }
     },

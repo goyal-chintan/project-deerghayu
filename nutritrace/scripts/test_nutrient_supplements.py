@@ -181,6 +181,7 @@ rec_tea = make_test_record(
     group="", diet_type="vegetarian",
     source="INDB 2024.11",
     nutrition={"calories": 35},
+    serving_grams=210.5,
 )
 assert_eq(rec_tea["nutrition_meta"]["caffeine"]["status"], STATUS_MISSING,
            "Tea caffeine remains missing (not explicit_zero)")
@@ -191,6 +192,7 @@ rec_coffee = make_test_record(
     group="", diet_type="vegetarian",
     source="INDB 2024.11",
     nutrition={"calories": 40},
+    serving_grams=450.0,
 )
 assert_eq(rec_coffee["nutrition_meta"]["caffeine"]["status"], STATUS_MISSING,
            "Coffee caffeine remains missing")
@@ -1022,20 +1024,24 @@ for key in critical_indb:
                 f"Critical INDB override '{key}' has valid basis")
 
 # -----------------------------------------------------------------------
-print("\n[Test 41] INDB zero recipe override does not require scaling (0 * anything = 0)")
+print("\n[Test 41] INDB milk tea recipe override gives positive B12 (not explicit_zero)")
 # -----------------------------------------------------------------------
-# Hot tea (ASC001) has B12=0 explicit_zero override — no scaling needed
-rec_tea_zero = make_test_record(
+# Hot tea (ASC001) has B12 estimated positive override (milk content detected)
+rec_tea_b12 = make_test_record(
     name="Hot tea (Garam Chai)", code="ASC001",
     group="", diet_type="vegetarian",
     source="INDB 2024.11",
     nutrition={"calories": 35},
-    serving_grams=189.7,
+    serving_grams=210.5,
 )
-assert_eq(rec_tea_zero["nutrition"]["b12"], 0,
-           "INDB zero override stays 0 (no scaling effect)")
-assert_eq(rec_tea_zero["nutrition_meta"]["b12"]["status"], STATUS_EXPLICIT_ZERO,
-           "INDB zero override status = explicit_zero")
+assert_true(rec_tea_b12["nutrition"]["b12"] > 0,
+           f"INDB milk tea B12 > 0 (got {rec_tea_b12['nutrition']['b12']})")
+assert_eq(rec_tea_b12["nutrition_meta"]["b12"]["status"], STATUS_ESTIMATED,
+           "INDB milk tea B12 status = estimated")
+assert_true(rec_tea_b12["nutrition_meta"]["b12"].get("citation") is not None,
+            "INDB milk tea B12 has citation")
+assert_true(rec_tea_b12["nutrition_meta"]["b12"].get("confidence") is not None,
+            "INDB milk tea B12 has confidence")
 
 # -----------------------------------------------------------------------
 # Summary
