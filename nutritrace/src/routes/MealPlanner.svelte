@@ -961,8 +961,8 @@
             <h3>{plannerSummary.headline}</h3>
             <p>{plannerSummary.mealsLogged} meal{plannerSummary.mealsLogged === 1 ? '' : 's'} planned · {plannerSummary.bestNextAction}</p>
           </div>
-          <button class="analytics-action" on:click={() => push('/nutrients')} aria-label="View nutrition analytics">
-            View analytics
+          <button class="analytics-action" on:click={() => push('/statistics')} aria-label="View nutrition statistics">
+            View nutrition statistics
           </button>
         </div>
 
@@ -994,9 +994,9 @@
                 <button
                   class="details-btn"
                   on:click={() => push('/nutrients')}
-                  aria-label="View nutrition analytics details for {recommendation.label}"
+                  aria-label="Find foods for {recommendation.label}"
                 >
-                  Details
+                  Find foods
                 </button>
               </div>
             {/each}
@@ -1004,7 +1004,7 @@
         {:else}
           <div class="planning-empty">
             <span class="material-symbols-rounded">check_circle</span>
-            <span>Open analytics for the full nutrient breakdown when you need more detail.</span>
+            <span>Open nutrition statistics for the full nutrient breakdown when you need more detail.</span>
           </div>
         {/if}
       </div>

@@ -1290,8 +1290,8 @@
           <span class="material-symbols-rounded fd-icon" aria-hidden="true">family_restroom</span>
           <span class="fd-title">Family Nutrition Today</span>
         </div>
-        <button class="fd-manage-btn" on:click={() => push('/nutrients')} title="View nutrient analytics" aria-label="View family nutrient analytics">
-          <span class="material-symbols-rounded" aria-hidden="true">analytics</span> Analytics
+        <button class="fd-manage-btn" on:click={() => push('/statistics')} title="View nutrition statistics" aria-label="View family nutrition statistics">
+          <span class="material-symbols-rounded" aria-hidden="true">analytics</span> Statistics
         </button>
       </div>
 
@@ -1321,7 +1321,7 @@
         {#if familyNutritionSummary.recommendations.length > 0}
           <div class="fd-recommendations" aria-label="Top family nutrition recommendations">
             {#each familyNutritionSummary.recommendations as row}
-              <button class="fd-recommendation-row" on:click={() => push('/nutrients')} aria-label={`Open nutrient analytics for ${row.label}`}>
+              <button class="fd-recommendation-row" on:click={() => push('/nutrients')} aria-label={`Find foods for ${row.label}`}>
                 <span class="fd-recommendation-main">
                   <strong>{row.label}</strong>
                   <small>{row.status.label} · {row.affectedLabel}</small>

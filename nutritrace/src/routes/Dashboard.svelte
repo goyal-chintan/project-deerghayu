@@ -50,12 +50,16 @@
     }
   }
 
-  function openNutrientAnalytics() {
+  function openNutritionStatistics() {
+    push('/statistics');
+  }
+
+  function openFoodSources() {
     push('/nutrients');
   }
 
   function recommendationLabel(recommendation) {
-    return `View nutrient analytics for ${recommendation.label}: ${recommendation.foodMove}`;
+    return `Find foods for ${recommendation.label}: ${recommendation.foodMove}`;
   }
 </script>
 
@@ -97,10 +101,10 @@
           <button
             type="button"
             class="secondary-action"
-            on:click={openNutrientAnalytics}
-            aria-label="View nutrient analytics"
+            on:click={openNutritionStatistics}
+            aria-label="View nutrition statistics"
           >
-            View nutrient analytics
+            View nutrition statistics
           </button>
         </div>
       </div>
@@ -187,14 +191,14 @@
         <div class="recommendations-panel" aria-labelledby="recommendations-title">
           <div class="panel-heading">
             <h3 id="recommendations-title">Recommended improvements</h3>
-            <p>Open analytics for details, affected members, and food sources.</p>
+            <p>Find food sources for details and affected members.</p>
           </div>
           <div class="recommendation-list">
             {#each recommendations as recommendation (recommendation.id)}
               <button
                 type="button"
                 class="recommendation-row"
-                on:click={openNutrientAnalytics}
+                on:click={openFoodSources}
                 aria-label={recommendationLabel(recommendation)}
               >
                 <span class="recommendation-icon material-symbols-rounded">trending_up</span>
@@ -213,7 +217,7 @@
           <span class="material-symbols-rounded steady-icon">check_circle</span>
           <div>
             <h3>No high-impact gaps right now</h3>
-            <p>Keep logging meals or open analytics to review detailed coverage.</p>
+            <p>Keep logging meals or view statistics to review detailed coverage.</p>
           </div>
         </div>
       {/if}
