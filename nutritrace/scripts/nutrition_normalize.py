@@ -286,6 +286,28 @@ def _validate_supplements(data):
                         f"Defined: {sorted(defined_sources)}"
                     )
 
+                # Validate confidence if present (applies to all overrides)
+                confidence = override.get("confidence")
+                if confidence is not None:
+                    if isinstance(confidence, bool):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be numeric (not bool), "
+                            f"got {confidence!r}."
+                        )
+                    if not isinstance(confidence, (int, float)):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be numeric, "
+                            f"got {type(confidence).__name__}."
+                        )
+                    if not math.isfinite(confidence):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be finite, got {confidence!r}."
+                        )
+                    if not (0 <= confidence <= 1):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be 0-1, got {confidence}."
+                        )
+
                 # Positive values require stricter validation
                 if value > 0:
                     status = override.get("status")
@@ -304,25 +326,10 @@ def _validate_supplements(data):
                             f"{loc}: positive value ({value}) requires non-empty "
                             f"'citation' string."
                         )
-                    confidence = override.get("confidence")
                     if confidence is None:
                         raise ValueError(
                             f"{loc}: positive value ({value}) requires 'confidence' "
                             f"(numeric 0-1)."
-                        )
-                    if isinstance(confidence, bool):
-                        raise ValueError(
-                            f"{loc}: 'confidence' must be numeric (not bool), "
-                            f"got {confidence!r}."
-                        )
-                    if not isinstance(confidence, (int, float)):
-                        raise ValueError(
-                            f"{loc}: 'confidence' must be numeric, "
-                            f"got {type(confidence).__name__}."
-                        )
-                    if not (0 <= confidence <= 1):
-                        raise ValueError(
-                            f"{loc}: 'confidence' must be 0-1, got {confidence}."
                         )
                     # Basis is required for positive overrides
                     basis = override.get("basis")

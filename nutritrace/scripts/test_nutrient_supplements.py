@@ -694,7 +694,7 @@ except ValueError as e:
 print("\n[Test 27] per_100g INDB recipe scaling — Afghani chicken")
 # -----------------------------------------------------------------------
 # Afghani chicken: override B12 = 0.15 per_100g, serving_grams = 189.7
-# Expected stored value = 0.15 * 189.7 / 100 = 0.28455 → rounded to 4dp = 0.2846
+# Expected stored value = round(0.15 * 189.7 / 100, 4) = 0.2845
 rec_afghani_scaled = make_test_record(
     name="Afghani chicken", code="OSR062",
     group="", diet_type="non-vegetarian",
@@ -896,6 +896,33 @@ bad_bool_conf = {
 try:
     _validate_supplements(bad_bool_conf)
     assert_true(False, "Should reject bool confidence in override")
+except ValueError as e:
+    assert_true("bool" in str(e).lower() and "confidence" in str(e).lower(),
+                f"ValueError mentions bool confidence: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 36b] Bool confidence on ZERO override is also rejected")
+# -----------------------------------------------------------------------
+bad_zero_bool_conf = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "caffeine": {
+                "value": 0,
+                "status": "explicit_zero",
+                "source_ref": "test_src",
+                "citation": "Domain knowledge",
+                "confidence": True,  # bool not allowed even on zero override!
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_zero_bool_conf)
+    assert_true(False, "Should reject bool confidence on zero override")
 except ValueError as e:
     assert_true("bool" in str(e).lower() and "confidence" in str(e).lower(),
                 f"ValueError mentions bool confidence: {e}")
