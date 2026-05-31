@@ -24,6 +24,7 @@ Thumbs.db
 
 # Local backups (not needed in repo)
 .backup-polish/
+.worktrees/
 
 # Bind mount data (DB + uploads live on the host, not in git)
 data/
