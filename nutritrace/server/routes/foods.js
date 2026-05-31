@@ -13,6 +13,13 @@ const uid = req => userMgmtActive() ? req.user.id : null;
 
 const canRead = (food, u) => _canRead(food, u, 'food_shares', 'food_id');
 
+const VALID_DIET_TYPES = ['vegetarian', 'non-vegetarian', 'vegan', 'eggetarian'];
+function validateDietType(val) {
+  if (!val) return 'vegetarian';
+  if (!VALID_DIET_TYPES.includes(val)) return null; // invalid
+  return val;
+}
+
 // ── GET / — own foods + shared foods from others ──────────────────────────
 router.get('/', wrap((req, res) => {
   const u = uid(req);
@@ -59,8 +66,10 @@ router.get('/:id', wrap((req, res) => {
 
 // ── POST / ────────────────────────────────────────────────────────────────
 router.post('/', wrap(async (req, res) => {
-  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id } = req.body;
+  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, diet_type } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
+  const dietType = validateDietType(diet_type);
+  if (dietType === null) return res.status(400).json({ error: 'Invalid diet_type. Must be one of: vegetarian, non-vegetarian, vegan, eggetarian' });
   const u = uid(req);
   const vis = visibility || 'private';
   // Dedup by barcode within the user's library. The client-side scan handler
@@ -79,10 +88,10 @@ router.post('/', wrap(async (req, res) => {
   // Download external images to /uploads/ for self-hosting
   const localImg = isExternalUrl(img_url) ? await localizeImage(img_url) : (img_url || null);
   const result = db.prepare(
-    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, diet_type, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   ).run(u, name, brand || null, JSON.stringify(nutrition || {}), portion ?? 100, unit || 'g',
-    localImg, notes || null, category || null, barcode || null, vis, source_id || null);
+    localImg, notes || null, category || null, barcode || null, vis, source_id || null, dietType);
   res.status(201).json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(result.lastInsertRowid)));
 }));
 
@@ -92,16 +101,21 @@ router.put('/:id', wrap(async (req, res) => {
   const existing = db.prepare('SELECT * FROM foods WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   if (u != null && existing.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
-  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, favorite } = req.body;
+  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, favorite, diet_type } = req.body;
+  if (diet_type != null) {
+    const validated = validateDietType(diet_type);
+    if (validated === null) return res.status(400).json({ error: 'Invalid diet_type. Must be one of: vegetarian, non-vegetarian, vegan, eggetarian' });
+  }
   const localImg = (img_url && isExternalUrl(img_url)) ? await localizeImage(img_url) : (img_url ?? existing.img_url);
   const fav = favorite != null ? (favorite ? 1 : 0) : existing.favorite;
+  const dt = diet_type != null ? validateDietType(diet_type) : existing.diet_type;
   db.prepare(
-    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, visibility=?, favorite=?, updated_at=datetime('now') WHERE id=?`
+    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, visibility=?, favorite=?, diet_type=?, updated_at=datetime('now') WHERE id=?`
   ).run(name ?? existing.name, brand ?? existing.brand,
     JSON.stringify(nutrition ?? JSON.parse(existing.nutrition || '{}')),
     portion ?? existing.portion, unit ?? existing.unit, localImg,
     notes ?? existing.notes, category ?? existing.category, barcode ?? existing.barcode,
-    visibility ?? existing.visibility, fav, req.params.id);
+    visibility ?? existing.visibility, fav, dt, req.params.id);
   res.json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(req.params.id)));
 }));
 
@@ -174,10 +188,10 @@ router.post('/:id/copy', wrap((req, res) => {
   }
 
   const result = db.prepare(
-    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private', ?, datetime('now'))`
+    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, diet_type, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private', ?, ?, datetime('now'))`
   ).run(u, food.name, food.brand, food.nutrition, food.portion, food.unit,
-    food.img_url, food.notes, food.category, food.barcode, food.id);
+    food.img_url, food.notes, food.category, food.barcode, food.id, food.diet_type);
   res.status(201).json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(result.lastInsertRowid)));
 }));
 

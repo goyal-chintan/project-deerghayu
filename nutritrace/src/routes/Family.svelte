@@ -170,7 +170,7 @@
 <div class="page-shell">
   <header class="page-header">
     <div class="ph-left">
-      <button class="icon-btn" on:click={() => push('/')}>
+      <button class="icon-btn" aria-label="Back" on:click={() => push('/')}>
         <span class="material-symbols-rounded">arrow_back</span>
       </button>
       <h1 class="page-title">Family Manager</h1>
@@ -199,8 +199,8 @@
             <div class="m-header">
               <h3>{m.name}</h3>
               <div class="m-actions">
-                <button class="icon-btn sm" on:click={() => editMember(m)}><span class="material-symbols-rounded">edit</span></button>
-                <button class="icon-btn sm danger" on:click={() => remove(m.id)}><span class="material-symbols-rounded">delete</span></button>
+                <button class="icon-btn sm" aria-label="Edit member" on:click={() => editMember(m)}><span class="material-symbols-rounded">edit</span></button>
+                <button class="icon-btn sm danger" aria-label="Delete member" on:click={() => remove(m.id)}><span class="material-symbols-rounded">delete</span></button>
               </div>
             </div>
             <div class="m-demographics text-2">
@@ -212,25 +212,44 @@
             
             <div class="m-targets mt-3">
               <h4 class="text-2 mb-2">Daily Scientific Targets</h4>
+              <div class="target-section-label">Macros</div>
               <div class="target-grid">
                 <div class="t-item">
+                  <span class="t-icon material-symbols-rounded">local_fire_department</span>
                   <span class="t-val">{m.targets.calories}</span> <span class="t-lbl">kcal</span>
                 </div>
                 <div class="t-item">
+                  <span class="t-icon material-symbols-rounded">fitness_center</span>
                   <span class="t-val">{m.targets.proteins}g</span> <span class="t-lbl">Protein</span>
                 </div>
                 <div class="t-item">
+                  <span class="t-icon material-symbols-rounded">grain</span>
                   <span class="t-val">{m.targets.carbohydrates}g</span> <span class="t-lbl">Carbs</span>
                 </div>
                 <div class="t-item">
+                  <span class="t-icon material-symbols-rounded">water_drop</span>
                   <span class="t-val">{m.targets.fat}g</span> <span class="t-lbl">Fat</span>
                 </div>
+                <div class="t-item">
+                  <span class="t-icon material-symbols-rounded">grass</span>
+                  <span class="t-val">{m.targets.fiber}g</span> <span class="t-lbl">Fiber</span>
+                </div>
               </div>
-              <div class="target-grid mt-2">
-                <div class="t-item"><span class="t-val">{m.targets.calcium}mg</span> <span class="t-lbl">Calcium</span></div>
-                <div class="t-item"><span class="t-val">{m.targets.iron}mg</span> <span class="t-lbl">Iron</span></div>
-                <div class="t-item"><span class="t-val">{m.targets['vitamin-a']}mcg</span> <span class="t-lbl">Vit A</span></div>
-                <div class="t-item"><span class="t-val">{m.targets['vitamin-c']}mg</span> <span class="t-lbl">Vit C</span></div>
+              <div class="target-section-label">Minerals</div>
+              <div class="target-grid">
+                <div class="t-item"><span class="t-icon material-symbols-rounded">bone</span><span class="t-val">{m.targets.calcium}mg</span> <span class="t-lbl">Calcium</span></div>
+                <div class="t-item"><span class="t-icon material-symbols-rounded">hub</span><span class="t-val">{m.targets.iron}mg</span> <span class="t-lbl">Iron</span></div>
+                <div class="t-item"><span class="t-icon material-symbols-rounded">shield</span><span class="t-val">{m.targets.zinc}mg</span> <span class="t-lbl">Zinc</span></div>
+                <div class="t-item"><span class="t-icon material-symbols-rounded">bolt</span><span class="t-val">{m.targets.magnesium}mg</span> <span class="t-lbl">Magnesium</span></div>
+                <div class="t-item"><span class="t-icon material-symbols-rounded">electric_bolt</span><span class="t-val">{m.targets.potassium}mg</span> <span class="t-lbl">Potassium</span></div>
+              </div>
+              <div class="target-section-label">Vitamins</div>
+              <div class="target-grid">
+                <div class="t-item"><span class="t-icon material-symbols-rounded">visibility</span><span class="t-val">{m.targets['vitamin-a']}mcg</span> <span class="t-lbl">Vit A</span></div>
+                <div class="t-item"><span class="t-icon material-symbols-rounded">immune</span><span class="t-val">{m.targets['vitamin-c']}mg</span> <span class="t-lbl">Vit C</span></div>
+                <div class="t-item"><span class="t-icon material-symbols-rounded">sunny</span><span class="t-val">{m.targets['vitamin-d']}mcg</span> <span class="t-lbl">Vit D</span></div>
+                <div class="t-item"><span class="t-icon material-symbols-rounded">genetics</span><span class="t-val">{m.targets.b9}mcg</span> <span class="t-lbl">Folate B9</span></div>
+                <div class="t-item"><span class="t-icon material-symbols-rounded">neurology</span><span class="t-val">{m.targets.b12}mcg</span> <span class="t-lbl">Vit B12</span></div>
               </div>
             </div>
           </div>
@@ -242,10 +261,10 @@
 
 {#if showModal}
   <div class="modal-backdrop" transition:fade={{duration:200}} on:click={() => showModal=false} on:keydown={(e) => e.key === 'Escape' && (showModal=false)} role="button" tabindex="0">
-    <div class="modal-surface" on:click|stopPropagation on:keydown|stopPropagation role="dialog" aria-modal="true" tabindex="-1">
+    <div class="modal-surface" on:click|stopPropagation on:keydown|stopPropagation role="dialog" aria-modal="true" aria-labelledby="member-modal-title" tabindex="-1">
       <header class="modal-header">
-        <h3>{form.id ? 'Edit Member' : 'New Member'}</h3>
-        <button class="icon-btn" on:click={() => showModal=false}><span class="material-symbols-rounded">close</span></button>
+        <h3 id="member-modal-title">{form.id ? 'Edit Member' : 'New Member'}</h3>
+        <button class="icon-btn" aria-label="Close" on:click={() => showModal=false}><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
         <label class="input-group">
@@ -300,7 +319,7 @@
         </label>
 
         {#if previewTargets}
-          <div class="preview-targets-box mt-3 p-3" style="background: var(--bg-2); border-radius: var(--radius-md); border: 1px solid var(--border);">
+          <div class="preview-targets-box mt-3 p-3" style="background: var(--surface-2); border-radius: var(--radius-md); border: 1px solid var(--border);">
             <h4 class="text-xs uppercase tracking-wide text-3 mb-2" style="font-weight: 700; font-size: 11px;">Predicted Science Targets (Preview)</h4>
             <div style="display: flex; justify-content: space-between; text-align: center; font-size: 12px;">
               <div>
@@ -383,16 +402,31 @@
     gap: 8px;
     flex-wrap: wrap;
   }
+  .target-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-3);
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
   .t-item {
-    background: var(--bg-2);
+    background: var(--surface-2);
     padding: 6px 10px;
     border-radius: var(--radius-sm);
     font-size: 13px;
     display: flex;
     flex-direction: column;
+    align-items: center;
     flex: 1;
     min-width: 60px;
     text-align: center;
+  }
+  .t-icon {
+    font-size: 16px;
+    color: var(--accent);
+    margin-bottom: 2px;
   }
   .t-val { font-weight: 600; color: var(--text-1); }
   .t-lbl { font-size: 11px; color: var(--text-3); margin-top: 2px; }

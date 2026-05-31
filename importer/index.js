@@ -50,6 +50,7 @@ const COL = {
   ribf:     111, // Riboflavin / B2 (mg)
   nia:      113, // Niacin / B3 (mg)
   vitb6c:   117, // Vitamin B6 (mg)
+  vitb12:   119, // Vitamin B12 (µg) — verify column index against IFCT header
   folsum:   121, // Folate total / B9 (µg)
   ca:       169, // Calcium (mg)
   fe:       177, // Iron (mg)
@@ -61,6 +62,14 @@ const COL = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+function dietTypeFromTags(tags) {
+  const t = (tags || '').toLowerCase();
+  if (t.includes('vegan')) return 'vegan';
+  if (t.includes('eggetarian')) return 'eggetarian';
+  if (t.includes('vegetarian')) return 'vegetarian';
+  return 'non-vegetarian';
+}
+
 function kJtoKcal(kj) {
   if (!kj || isNaN(kj)) return '';
   const kcal = parseFloat(kj) / 4.184;
@@ -117,8 +126,8 @@ const HEADER = [
   'Magnesium (mg)', 'Phosphorus (mg)', 'Zinc (mg)',
   'Vitamin A (µg)', 'Vitamin C (mg)', 'Vitamin D (µg)',
   'B1 Thiamine (mg)', 'B2 Riboflavin (mg)', 'B3 Niacin (mg)',
-  'B6 (mg)', 'B9 Folate (µg)',
-  'Notes',
+  'B6 (mg)', 'B9 Folate (µg)', 'B12 (µg)',
+  'Notes', 'Diet Type',
 ];
 
 // A fixed import date — NutriTrace needs a date; we pick today.
@@ -189,7 +198,9 @@ async function main() {
       safeNum(cols[COL.nia],  1000), // B3 mg
       safeNum(cols[COL.vitb6c], 1000),// B6 mg
       safeNum(cols[COL.folsum], 1e6), // B9 µg (IFCT in g/100g → ×1,000,000)
+      safeNum(cols[COL.vitb12], 1e6), // B12 µg (IFCT in g/100g → ×1,000,000)
       `IFCT2017:${cols[COL.code]} | Group: ${grup}`, // Notes
+      dietTypeFromTags(tags),         // Diet Type
     ];
 
     out.write(csvRow(row) + '\n');
@@ -235,7 +246,9 @@ async function main() {
         n.b3 != null ? String(n.b3) : '',
         '',                                                   // b6
         n.b9 != null ? String(n.b9) : '',
+        n.b12 != null ? String(n.b12) : '',
         r.notes || '',
+        r.diet_type || 'vegetarian',                          // Diet Type
       ];
       out.write(csvRow(row) + '\n');
       recipeCount++;

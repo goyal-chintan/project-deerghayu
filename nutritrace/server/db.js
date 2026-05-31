@@ -36,6 +36,7 @@ db.exec(`
     notes      TEXT,
     category   TEXT,
     barcode    TEXT,
+    diet_type  TEXT NOT NULL DEFAULT 'vegetarian',
     created_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -51,6 +52,7 @@ db.exec(`
     portion    REAL DEFAULT 100,
     unit       TEXT DEFAULT 'g',
     servings   INTEGER DEFAULT 1,
+    diet_type  TEXT NOT NULL DEFAULT 'vegetarian',
     created_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -463,6 +465,14 @@ if (!columnExists('meals', 'visibility')) {
 }
 if (!columnExists('meals', 'source_id')) {
   db.exec(`ALTER TABLE meals ADD COLUMN source_id INTEGER`);
+}
+
+// ── Diet type migration ─────────────────────────────────────────────────────
+if (!columnExists('foods', 'diet_type')) {
+  db.exec(`ALTER TABLE foods ADD COLUMN diet_type TEXT NOT NULL DEFAULT 'vegetarian'`);
+}
+if (!columnExists('meals', 'diet_type')) {
+  db.exec(`ALTER TABLE meals ADD COLUMN diet_type TEXT NOT NULL DEFAULT 'vegetarian'`);
 }
 
 // ── Sync migrations (Phase 2) ──────────────────────────────────────────────

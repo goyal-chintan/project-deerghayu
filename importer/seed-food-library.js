@@ -20,9 +20,9 @@ import http from 'http';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Config ────────────────────────────────────────────────────────────────
-const SERVER     = 'http://localhost:3002';
-const USERNAME   = 'charu';
-const PASSWORD   = 'Deerghayu@2024';
+const SERVER     = process.env.NT_SERVER || 'http://localhost:3002';
+const USERNAME   = process.env.NT_USERNAME || 'admin';
+const PASSWORD   = process.env.NT_PASSWORD || '';
 
 const IFCT_CSV     = path.join(__dirname, 'node_modules/@nodef/ifct2017/compositions/index.csv');
 const RECIPES_JSON = path.join(__dirname, 'datasets/cooked-recipes.json');
@@ -42,6 +42,7 @@ const COL = {
   ribf: 111,      // B2
   nia: 113,       // B3
   vitb6c: 117,    // B6
+  vitb12: 119,    // B12 (g/100g → µg ×1e6) — verify column index against IFCT header
   folsum: 121,    // Folate (g/100g → µg ×1e6)
   ca: 169,        // Calcium (g/100g → mg ×1000)
   fe: 177,        // Iron
@@ -51,6 +52,14 @@ const COL = {
   na: 199,        // Sodium
   zn: 201,        // Zinc
 };
+
+function dietTypeFromTags(tags) {
+  const t = (tags || '').toLowerCase();
+  if (t.includes('vegan')) return 'vegan';
+  if (t.includes('eggetarian')) return 'eggetarian';
+  if (t.includes('vegetarian')) return 'vegetarian';
+  return 'non-vegetarian';
+}
 
 function kJtoKcal(v)       { const n = parseFloat(v); return isNaN(n) ? null : Math.round(n / 4.184 * 10) / 10; }
 function scale(v, s)       { const n = parseFloat(v); return isNaN(n) || n === 0 ? undefined : Math.round(n * s * 1000) / 1000; }
@@ -113,6 +122,12 @@ async function login() {
 
 // ── Main ──────────────────────────────────────────────────────────────────
 async function main() {
+  if (!PASSWORD && !process.env.NT_PASSWORD) {
+    console.error('❌ Set NT_PASSWORD environment variable (or NT_USERNAME, NT_SERVER)');
+    console.error('   Usage: NT_USERNAME=user NT_PASSWORD=pass node seed-food-library.js');
+    process.exit(1);
+  }
+
   console.log('🥗 Project Deerghayu — Food Library Seeder');
   console.log('─────────────────────────────────────────────');
 
@@ -176,6 +191,7 @@ async function main() {
       'b3':          scale(cols[COL.nia], 1000),
       'b6':          scale(cols[COL.vitb6c], 1000),
       'b9':          scale(cols[COL.folsum], 1e6),
+      'b12':         scale(cols[COL.vitb12], 1e6),  // B12 g/100g → mcg
     };
     // Remove undefined keys
     Object.keys(nutrition).forEach(k => nutrition[k] === undefined && delete nutrition[k]);
@@ -187,6 +203,7 @@ async function main() {
       unit:     'g',
       notes:    `${grup} | IFCT code: ${code}`,
       nutrition,
+      diet_type: dietTypeFromTags(tags),
     };
 
     try {
@@ -222,6 +239,7 @@ async function main() {
         portion:  r.portion || 100,
         unit:     r.unit || 'g',
         notes:    r.notes || '',
+        diet_type: r.diet_type || 'vegetarian',
         nutrition: {
           calories:      n.calories,
           proteins:      n.proteins,

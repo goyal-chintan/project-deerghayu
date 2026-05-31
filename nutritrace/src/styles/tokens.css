@@ -35,6 +35,14 @@
   --danger:        #FF5C5C;
   --info:          #4FC3F7;
 
+  /* Diet (constant across accent themes — veg=green is a fixed convention) */
+  --diet-veg:      #4ADE80;
+  --diet-veg-dim:  rgba(74, 222, 128, 0.15);
+  --diet-egg:      #F5B445;
+  --diet-egg-dim:  rgba(245, 180, 69, 0.15);
+  --diet-nonveg:   #FF7A66;
+  --diet-nonveg-dim: rgba(255, 122, 102, 0.15);
+
   /* Macros */
   --macro-fat:          #FFB347;
   --macro-carbs:        #4FFFB0;
@@ -82,6 +90,14 @@
   --warning:       #E09400;
   --danger:        #D93025;
   --info:          #0277BD;
+
+  /* Diet (constant across accent themes) */
+  --diet-veg:      #16A34A;
+  --diet-veg-dim:  rgba(22, 163, 74, 0.10);
+  --diet-egg:      #D97706;
+  --diet-egg-dim:  rgba(217, 119, 6, 0.10);
+  --diet-nonveg:   #DC2626;
+  --diet-nonveg-dim: rgba(220, 38, 38, 0.10);
 
   --macro-fat:          #E07A00;
   --macro-carbs:        #00A865;

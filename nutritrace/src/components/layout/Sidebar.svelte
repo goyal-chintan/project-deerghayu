@@ -31,12 +31,15 @@
   }
 
   $: BASE_NAV = [
-    { path: '/',           icon: 'book',           label: $_('nav.diary')      },
+    { path: '/dashboard',  icon: 'home',           label: 'Home' },
+    { path: '/',           icon: 'edit_note',      label: $_('nav.diary')      },
     { path: '/foods',      icon: 'restaurant',     label: $_('nav.foods')      },
+    { path: '/nutrients',  icon: 'science',        label: 'Nutrients' },
+    { path: '/planner',    icon: 'calendar_month', label: 'Planner' },
+    { path: '/grocery',    icon: 'shopping_cart',  label: 'Grocery List' },
+    { path: '/family',     icon: 'family_restroom',label: 'Family' },
     { path: '/statistics', icon: 'bar_chart',      label: $_('nav.statistics') },
     { path: '/goals',      icon: 'flag',           label: $_('nav.goals')      },
-    { path: '/family',     icon: 'family_restroom',label: 'Family' },
-    { path: '/planner',    icon: 'calendar_month', label: 'Planner' },
     { path: '/settings',   icon: 'settings',       label: $_('nav.settings')   },
   ];
 

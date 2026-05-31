@@ -14,6 +14,7 @@
   import { isNative } from '../lib/platform.js';
   import BarcodeScanner from '../components/foods/BarcodeScanner.svelte';
   import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks, aiProvider, aiApiKey, aiModel, aiBaseUrl, energyUnit, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
+  import { DIET_TYPES, DIET_LABELS } from '../lib/dietType.js';
   import { callAI, callAIProxy } from '../lib/aiChat.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
 
@@ -153,7 +154,7 @@
 
   let food = {
     name:'', brand:'', barcode:'', imgUrl:'',
-    portion: 100, unit: 'g', categories: [], notes: '',
+    portion: 100, unit: 'g', categories: [], notes: '', diet_type: 'vegetarian',
     calories: '', kilojoules: '', fat: '', 'saturated-fat': '', 'trans-fat': '', 'polyunsaturated-fat': '', 'monounsaturated-fat': '', carbohydrates: '',
     sugars: '', 'added-sugars': '', proteins: '', salt: '', fiber: '',
     sodium: '', cholesterol: '', potassium: '', caffeine: '', alcohol: '',
@@ -938,6 +939,16 @@
         </div>
       </div>
     {/if}
+
+    <!-- Diet Type -->
+    <div class="card editor-card">
+      <div class="editor-card-title">Diet Type</div>
+      <select class="input" bind:value={food.diet_type}>
+        {#each DIET_TYPES as dt}
+          <option value={dt}>{DIET_LABELS[dt]}</option>
+        {/each}
+      </select>
+    </div>
 
     <!-- Notes -->
     {#if $foodsShowNotes}
