@@ -18,6 +18,9 @@ seed time by server/seed/classify.js so the rules are unit-testable.
 """
 import os, json, math
 import openpyxl
+from nutrition_normalize import (
+    SUPPORTED_NUTRIENTS, normalize_record, apply_supplements,
+)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "data", "Anuvaad_INDB_2024.11.xlsx")
@@ -185,16 +188,24 @@ def main():
 
         psrc = str(row[idx["primarysource"]] or "").strip()
         src_counts[psrc] = src_counts.get(psrc, 0) + 1
-        out.append({
+        code = str(row[idx["food_code"]] or "").strip()
+        record = {
             "name": name,
             "source": "INDB 2024.11",
-            "code": str(row[idx["food_code"]] or "").strip(),
+            "code": code,
             "primarysource": psrc,
             "serving_unit": serving_unit,
             "serving_grams": serving_g,
             "basis": basis,
-            "nutrition": nutrition,
-        })
+        }
+        # Normalize: fill all 34 supported nutrient keys with provenance.
+        # source_values is the partially-filled nutrition dict from INDB columns.
+        normalize_record(record, "INDB 2024.11", nutrition)
+        # Apply supplement rules and recipe overrides.
+        # INDB has no group/diet_type classification; pass empty strings.
+        # serving_grams is already on record for per_100g override scaling.
+        apply_supplements(record, code, name, "", "", "INDB 2024.11")
+        out.append(record)
 
     out.sort(key=lambda x: x["name"].lower())
     os.makedirs(os.path.dirname(OUT), exist_ok=True)

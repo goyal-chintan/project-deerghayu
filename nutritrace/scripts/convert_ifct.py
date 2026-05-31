@@ -10,6 +10,9 @@ Nutrition values are factual; provenance is recorded per row. AGPL-licensed
 extract — only numeric facts + citation are carried over (license mitigation).
 """
 import os, json, math, urllib.request
+from nutrition_normalize import (
+    SUPPORTED_NUTRIENTS, normalize_record, apply_supplements,
+)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(HERE, "data", "ifct_compositions.csv")
@@ -116,15 +119,21 @@ def main():
                 nutrition.pop(k, None)
         diet = diet_from_tags(r.get("tags"))
         diet_counts[diet] = diet_counts.get(diet, 0) + 1
-        out.append({
+        code = (r.get("code") or "").strip()
+        group = (r.get("grup") or "").strip() or None
+        record = {
             "name": name,
             "scientific": (r.get("scie") or "").strip() or None,
             "source": "IFCT 2017",
-            "code": (r.get("code") or "").strip(),
-            "group": (r.get("grup") or "").strip() or None,
+            "code": code,
+            "group": group,
             "diet_type": diet,
-            "nutrition": nutrition,
-        })
+        }
+        # Normalize: fill all 34 supported nutrient keys with provenance
+        normalize_record(record, "IFCT 2017", nutrition)
+        # Apply supplement rules (explicit zeros) and item overrides (B12 etc.)
+        apply_supplements(record, code, name, group or "", diet, "IFCT 2017")
+        out.append(record)
     out.sort(key=lambda x: x["name"].lower())
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as fh:

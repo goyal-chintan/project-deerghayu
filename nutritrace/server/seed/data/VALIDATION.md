@@ -1,6 +1,6 @@
 # Indian Nutrition Data — Validation Report
 
-_Generated 2026-05-30 by `scripts/validate_data.py`._
+_Generated 2026-05-31 by `scripts/validate_data.py`._
 
 - **Ingredients (IFCT 2017):** 542 foods
 - **Recipes (INDB 2024.11):** 984 dishes (81 use per-100g fallback; rest per realistic serving)
@@ -49,32 +49,32 @@ Stated calories vs 4·carb + 4·protein + 9·fat. Drift is expected from fiber, 
 
 | Nutrient | IFCT foods | INDB recipes |
 |---|--:|--:|
-| calories | 528 / 542 | 984 / 984 |
-| proteins | 528 / 542 | 983 / 984 |
-| fat | 542 / 542 | 982 / 984 |
-| carbohydrates | 313 / 542 | 983 / 984 |
-| fiber | 306 / 542 | 933 / 984 |
-| sugars | 314 / 542 | 983 / 984 |
-| saturated-fat | 523 / 542 | 981 / 984 |
-| cholesterol | 211 / 542 | 621 / 984 |
-| sodium | 528 / 542 | 982 / 984 |
-| calcium | 527 / 542 | 983 / 984 |
-| iron | 527 / 542 | 983 / 984 |
-| potassium | 528 / 542 | 983 / 984 |
-| magnesium | 527 / 542 | 983 / 984 |
-| zinc | 528 / 542 | 983 / 984 |
-| phosphorus | 527 / 542 | 983 / 984 |
-| vitamin-a | 481 / 542 | 618 / 984 |
-| vitamin-c | 229 / 542 | 885 / 984 |
-| vitamin-d | 498 / 542 | 945 / 984 |
-| vitamin-e | 524 / 542 | 979 / 984 |
-| vitamin-k | 519 / 542 | 969 / 984 |
-| b1 | 522 / 542 | 982 / 984 |
-| b2 | 526 / 542 | 982 / 984 |
-| b3 | 527 / 542 | 982 / 984 |
-| b6 | 528 / 542 | 981 / 984 |
-| b9 | 347 / 542 | 979 / 984 |
-| b12 | 0 / 542 | 0 / 984 |
+| calories | 542 / 542 | 984 / 984 |
+| proteins | 542 / 542 | 984 / 984 |
+| fat | 542 / 542 | 984 / 984 |
+| carbohydrates | 542 / 542 | 984 / 984 |
+| fiber | 542 / 542 | 984 / 984 |
+| sugars | 542 / 542 | 984 / 984 |
+| saturated-fat | 542 / 542 | 984 / 984 |
+| cholesterol | 542 / 542 | 984 / 984 |
+| sodium | 542 / 542 | 984 / 984 |
+| calcium | 542 / 542 | 984 / 984 |
+| iron | 542 / 542 | 984 / 984 |
+| potassium | 542 / 542 | 984 / 984 |
+| magnesium | 542 / 542 | 984 / 984 |
+| zinc | 542 / 542 | 984 / 984 |
+| phosphorus | 542 / 542 | 984 / 984 |
+| vitamin-a | 542 / 542 | 984 / 984 |
+| vitamin-c | 542 / 542 | 984 / 984 |
+| vitamin-d | 542 / 542 | 984 / 984 |
+| vitamin-e | 542 / 542 | 984 / 984 |
+| vitamin-k | 542 / 542 | 984 / 984 |
+| b1 | 542 / 542 | 984 / 984 |
+| b2 | 542 / 542 | 984 / 984 |
+| b3 | 542 / 542 | 984 / 984 |
+| b6 | 542 / 542 | 984 / 984 |
+| b9 | 542 / 542 | 984 / 984 |
+| b12 | 542 / 542 | 984 / 984 |
 
 ## Known limitations
 
