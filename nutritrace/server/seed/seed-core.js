@@ -6,12 +6,74 @@
  *
  * Both functions are idempotent: they UPSERT based on stable identity keys
  * so re-running the seeder never creates duplicates.
+ *
+ * Safety invariants:
+ * - Only `record.nutrition` (numeric values) is serialized to DB; `nutrition_meta` is never stored.
+ * - Every record must contain ALL supported nutrient keys (no missing, no extra).
+ * - Recipes only update existing rows that have INDB provenance in their notes;
+ *   user-created recipes with the same name are never overwritten.
  */
 
 import { classifyDiet } from './classify.js';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Canonical set of nutrient IDs — source of truth for validation.
+const SUPPORTED_NUTRIENT_IDS = JSON.parse(
+  readFileSync(join(__dirname, 'data', 'supported-nutrient-ids.json'), 'utf-8')
+);
+const SUPPORTED_SET = new Set(SUPPORTED_NUTRIENT_IDS);
 
 // Canonical diet types from the app (routes/foods.js line 16).
 const VALID_DIET_TYPES = ['vegetarian', 'non-vegetarian', 'vegan', 'eggetarian'];
+
+// Pattern identifying seed-owned recipe rows (INDB provenance in notes).
+const INDB_PROVENANCE_RE = /INDB 2024\.11, code \S+/;
+
+/**
+ * Validate that a nutrition object contains exactly the supported nutrient keys.
+ * Returns null if valid, or an error string describing the problem.
+ *
+ * @param {object} nutrition — nutrition object from seed record
+ * @param {string} label — human-readable identifier for error messages
+ * @returns {string|null}
+ */
+export function validateNutrition(nutrition, label) {
+  if (!nutrition || typeof nutrition !== 'object') {
+    return `${label}: nutrition is missing or not an object`;
+  }
+  const keys = Object.keys(nutrition);
+  const missing = SUPPORTED_NUTRIENT_IDS.filter(id => !(id in nutrition));
+  const extra = keys.filter(k => !SUPPORTED_SET.has(k));
+
+  if (missing.length || extra.length) {
+    const parts = [];
+    if (missing.length) parts.push(`missing: ${missing.join(', ')}`);
+    if (extra.length) parts.push(`extra: ${extra.join(', ')}`);
+    return `${label}: ${parts.join('; ')}`;
+  }
+  return null;
+}
+
+/**
+ * Extract only the numeric nutrition keys from a record, explicitly excluding
+ * `nutrition_meta` or any non-supported keys that might be in the source JSON.
+ * Returns a clean object with exactly the supported nutrient IDs.
+ *
+ * @param {object} record — seed data record with .nutrition (and possibly .nutrition_meta)
+ * @returns {object} — clean nutrition object for DB storage
+ */
+function extractNutrition(record) {
+  const source = record.nutrition || {};
+  const clean = {};
+  for (const id of SUPPORTED_NUTRIENT_IDS) {
+    clean[id] = source[id] ?? 0;
+  }
+  return clean;
+}
 
 /**
  * Seed IFCT ingredients into the `foods` table.
@@ -23,7 +85,7 @@ const VALID_DIET_TYPES = ['vegetarian', 'non-vegetarian', 'vegan', 'eggetarian']
  * @param {import('better-sqlite3').Database} db
  * @param {number} ownerId — user_id to own these foods
  * @param {Array} foods — array of IFCT food objects from ifct-foods.json
- * @returns {{inserted: number, updated: number}}
+ * @returns {{inserted: number, updated: number, skipped: number, errors: string[]}}
  */
 export function seedFoods(db, ownerId, foods) {
   if (!ownerId && ownerId !== 0) {
@@ -31,7 +93,7 @@ export function seedFoods(db, ownerId, foods) {
   }
 
   const findExisting = db.prepare(
-    `SELECT id FROM foods WHERE user_id = ? AND barcode = ?`
+    `SELECT id, notes FROM foods WHERE user_id = ? AND barcode = ?`
   );
 
   const insertStmt = db.prepare(`
@@ -48,12 +110,24 @@ export function seedFoods(db, ownerId, foods) {
 
   let inserted = 0;
   let updated = 0;
+  let skipped = 0;
+  const errors = [];
 
   const run = db.transaction(() => {
     for (const food of foods) {
       const code = food.code;
       const name = food.name;
-      const nutritionJson = JSON.stringify(food.nutrition || {});
+
+      // Validate nutrition completeness
+      const validationError = validateNutrition(food.nutrition, `food "${name}" (${code})`);
+      if (validationError) {
+        errors.push(validationError);
+        skipped++;
+        continue;
+      }
+
+      // Extract only supported numeric nutrition keys (never nutrition_meta)
+      const nutritionJson = JSON.stringify(extractNutrition(food));
       const category = food.group || null;
       const brand = 'IFCT 2017';
 
@@ -84,7 +158,7 @@ export function seedFoods(db, ownerId, foods) {
   });
 
   run();
-  return { inserted, updated };
+  return { inserted, updated, skipped, errors };
 }
 
 /**
@@ -94,10 +168,15 @@ export function seedFoods(db, ownerId, foods) {
  * guaranteed unique within the dataset. We use name (not code) because
  * the meals table has no barcode column, and name is the stable identity.
  *
+ * Conflict protection: if an existing recipe with the same name exists but
+ * its notes do NOT contain INDB provenance (`INDB 2024.11, code <code>`),
+ * it is treated as a user-created recipe and is never overwritten. The row
+ * is skipped and counted as a conflict.
+ *
  * @param {import('better-sqlite3').Database} db
  * @param {number} ownerId — user_id to own these recipes
  * @param {Array} recipes — array of INDB recipe objects from indb-recipes.json
- * @returns {{inserted: number, updated: number}}
+ * @returns {{inserted: number, updated: number, skipped: number, errors: string[]}}
  */
 export function seedRecipes(db, ownerId, recipes) {
   if (!ownerId && ownerId !== 0) {
@@ -105,7 +184,7 @@ export function seedRecipes(db, ownerId, recipes) {
   }
 
   const findExisting = db.prepare(
-    `SELECT id FROM meals WHERE user_id = ? AND is_recipe = 1 AND name = ?`
+    `SELECT id, notes FROM meals WHERE user_id = ? AND is_recipe = 1 AND name = ?`
   );
 
   const insertStmt = db.prepare(`
@@ -122,11 +201,23 @@ export function seedRecipes(db, ownerId, recipes) {
 
   let inserted = 0;
   let updated = 0;
+  let skipped = 0;
+  const errors = [];
 
   const run = db.transaction(() => {
     for (const recipe of recipes) {
       const name = recipe.name;
-      const nutritionJson = JSON.stringify(recipe.nutrition || {});
+
+      // Validate nutrition completeness
+      const validationError = validateNutrition(recipe.nutrition, `recipe "${name}" (${recipe.code})`);
+      if (validationError) {
+        errors.push(validationError);
+        skipped++;
+        continue;
+      }
+
+      // Extract only supported numeric nutrition keys (never nutrition_meta)
+      const nutritionJson = JSON.stringify(extractNutrition(recipe));
       const portion = recipe.serving_grams ?? 100;
       const dietType = classifyDiet(name);
 
@@ -138,6 +229,12 @@ export function seedRecipes(db, ownerId, recipes) {
 
       const existing = findExisting.get(ownerId, name);
       if (existing) {
+        // Conflict protection: only update if existing row has INDB provenance
+        if (!existing.notes || !INDB_PROVENANCE_RE.test(existing.notes)) {
+          // User-created recipe with same name — do not overwrite
+          skipped++;
+          continue;
+        }
         updateStmt.run(nutritionJson, portion, dietType, notes, existing.id);
         updated++;
       } else {
@@ -148,5 +245,5 @@ export function seedRecipes(db, ownerId, recipes) {
   });
 
   run();
-  return { inserted, updated };
+  return { inserted, updated, skipped, errors };
 }

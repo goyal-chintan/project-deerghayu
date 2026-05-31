@@ -53,7 +53,7 @@ seedOidcFromEnv();
 // user found in the database so the group catalogue is always populated.
 import { seedFoods, seedRecipes } from './seed/seed-core.js';
 import { readFileSync } from 'node:fs';
-{
+try {
   const owner = db.prepare('SELECT id FROM users ORDER BY id LIMIT 1').get();
   if (owner) {
     const seedDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'seed', 'data');
@@ -64,7 +64,21 @@ import { readFileSync } from 'node:fs';
     if (fRes.inserted || rRes.inserted) {
       logger.info(`[seed] Indian nutrition data: ${fRes.inserted} foods + ${rRes.inserted} recipes inserted`);
     }
+    if (fRes.updated || rRes.updated) {
+      logger.debug(`[seed] Updated: ${fRes.updated} foods, ${rRes.updated} recipes`);
+    }
+    if (fRes.skipped || rRes.skipped) {
+      logger.warn(`[seed] Skipped: ${fRes.skipped} foods, ${rRes.skipped} recipes (validation/conflict)`);
+    }
+    if (fRes.errors.length) {
+      logger.warn(`[seed] Food validation errors (${fRes.errors.length}):`, fRes.errors.slice(0, 5).join('; '));
+    }
+    if (rRes.errors.length) {
+      logger.warn(`[seed] Recipe validation errors (${rRes.errors.length}):`, rRes.errors.slice(0, 5).join('; '));
+    }
   }
+} catch (e) {
+  logger.error(`[seed] Auto-seed failed (startup continues): ${e.message}`);
 }
 
 const app  = express();
