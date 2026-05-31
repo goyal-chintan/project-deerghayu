@@ -8,7 +8,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -21,8 +21,10 @@ const idsPath = join(__dirname, 'data', 'supported-nutrient-ids.json');
 const jsonIds = JSON.parse(readFileSync(idsPath, 'utf-8'));
 
 describe('supported-nutrient-ids.json', () => {
-  it('has exactly 34 nutrients', () => {
-    assert.equal(jsonIds.length, 34);
+  const expectedCount = NUTRIMENTS.length;
+
+  it(`has exactly ${expectedCount} nutrients (matches NUTRIMENTS length)`, () => {
+    assert.equal(jsonIds.length, expectedCount);
   });
 
   it('matches NUTRIMENTS ids in exact order', () => {
@@ -38,7 +40,7 @@ describe('supported-nutrient-ids.json', () => {
   it('every entry is a non-empty string', () => {
     for (const id of jsonIds) {
       assert.equal(typeof id, 'string');
-      assert.ok(id.length > 0, `empty id found`);
+      assert.ok(id.length > 0, 'empty id found');
     }
   });
 });
