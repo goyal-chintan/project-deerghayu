@@ -17,7 +17,7 @@ Exits non-zero on any HARD failure:
 Soft signals (Atwater energy drift, sodium outliers, scientifically honest
 `missing` statuses) are reported but do not fail the gate.
 """
-import os, json, math, sys, datetime
+import os, json, math, sys
 from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -89,13 +89,23 @@ def check_structure(items, kind):
 
 def check_nutrient_completeness(items, kind, supported_keys):
     """HARD: every row must have ALL supported keys in nutrition and nutrition_meta.
-    Also rejects unsupported extra keys."""
+    Also rejects unsupported extra keys. Guards against non-dict fields."""
     fails = []
     supported_set = set(supported_keys)
     for i, o in enumerate(items):
         tag = f"{kind}[{i}] {o.get('name','?')!r}"
-        nut = o.get("nutrition", {})
-        meta = o.get("nutrition_meta", {})
+        nut = o.get("nutrition")
+        meta = o.get("nutrition_meta")
+
+        # Guard: nutrition must be a dict
+        if not isinstance(nut, dict):
+            fails.append(f"{tag}: nutrition is not a dict (got {type(nut).__name__})")
+            nut = {}  # skip per-key checks safely
+
+        # Guard: nutrition_meta must be a dict
+        if not isinstance(meta, dict):
+            fails.append(f"{tag}: nutrition_meta is not a dict (got {type(meta).__name__})")
+            meta = {}  # skip per-key checks safely
 
         # Check missing supported keys in nutrition
         missing_nut = supported_set - set(nut.keys())
@@ -120,12 +130,19 @@ def check_nutrient_completeness(items, kind, supported_keys):
 
 
 def check_status_vocabulary(items, kind):
-    """HARD: all nutrition_meta statuses must use valid vocabulary."""
+    """HARD: all nutrition_meta statuses must use valid vocabulary.
+    Guards against non-dict nutrition_meta or non-dict meta entries."""
     fails = []
     for i, o in enumerate(items):
         tag = f"{kind}[{i}] {o.get('name','?')!r}"
-        meta = o.get("nutrition_meta", {})
+        meta = o.get("nutrition_meta")
+        if not isinstance(meta, dict):
+            fails.append(f"{tag}: nutrition_meta is not a dict (got {type(meta).__name__})")
+            continue
         for k, m in meta.items():
+            if not isinstance(m, dict):
+                fails.append(f"{tag}: nutrition_meta[{k!r}] is not a dict (got {type(m).__name__})")
+                continue
             status = m.get("status")
             if status not in VALID_STATUSES:
                 fails.append(f"{tag}: invalid status {status!r} for {k}")
@@ -133,37 +150,55 @@ def check_status_vocabulary(items, kind):
 
 
 def check_b12_provenance(items, kind):
-    """HARD: B12-positive values must have source + citation + confidence."""
+    """HARD: B12-positive values must have source + citation + confidence.
+    Guards against non-dict nutrition/nutrition_meta/meta entries."""
     fails = []
     for i, o in enumerate(items):
-        b12_val = o.get("nutrition", {}).get("b12", 0)
-        if b12_val > 0:
-            tag = f"{kind}[{i}] {o.get('name','?')!r}"
-            meta = o.get("nutrition_meta", {}).get("b12", {})
-            missing_fields = []
-            if not meta.get("source"):
-                missing_fields.append("source")
-            if not meta.get("citation"):
-                missing_fields.append("citation")
-            if meta.get("confidence") is None:
-                missing_fields.append("confidence")
-            if missing_fields:
-                fails.append(f"{tag}: B12={b12_val} lacks {missing_fields}")
+        nut = o.get("nutrition")
+        if not isinstance(nut, dict):
+            continue  # already caught by completeness check
+        b12_val = nut.get("b12", 0)
+        if not isinstance(b12_val, (int, float)) or b12_val <= 0:
+            continue
+        tag = f"{kind}[{i}] {o.get('name','?')!r}"
+        meta_root = o.get("nutrition_meta")
+        if not isinstance(meta_root, dict):
+            fails.append(f"{tag}: B12={b12_val} but nutrition_meta is not a dict")
+            continue
+        meta = meta_root.get("b12")
+        if not isinstance(meta, dict):
+            fails.append(f"{tag}: B12={b12_val} but nutrition_meta.b12 is not a dict")
+            continue
+        missing_fields = []
+        if not meta.get("source"):
+            missing_fields.append("source")
+        if not meta.get("citation"):
+            missing_fields.append("citation")
+        if meta.get("confidence") is None:
+            missing_fields.append("confidence")
+        if missing_fields:
+            fails.append(f"{tag}: B12={b12_val} lacks {missing_fields}")
     return fails
 
 
 def check_zero_provenance(items, kind):
     """HARD: zero values with non-missing status must have proper provenance.
     A zero value with status != 'missing' needs at least a source field.
-    explicit_zero specifically must have a source explaining why zero."""
+    Guards against non-dict nutrition/nutrition_meta/meta entries."""
     fails = []
     for i, o in enumerate(items):
         tag = f"{kind}[{i}] {o.get('name','?')!r}"
-        nut = o.get("nutrition", {})
-        meta = o.get("nutrition_meta", {})
+        nut = o.get("nutrition")
+        if not isinstance(nut, dict):
+            continue  # already caught by completeness check
+        meta = o.get("nutrition_meta")
+        if not isinstance(meta, dict):
+            continue  # already caught by completeness check
         for k, v in nut.items():
             if v == 0:
-                m = meta.get(k, {})
+                m = meta.get(k)
+                if not isinstance(m, dict):
+                    continue  # already caught by status vocabulary check
                 status = m.get("status", "missing")
                 if status == "missing":
                     continue  # missing status is fine for zeros
@@ -201,7 +236,9 @@ def atwater_drift(items):
     worst = []
     checked = over = 0
     for o in items:
-        n = o["nutrition"]
+        n = o.get("nutrition")
+        if not isinstance(n, dict):
+            continue
         kcal = n.get("calories")
         if not kcal or kcal <= 0:
             continue
@@ -223,46 +260,67 @@ def coverage(items, keys):
     When nutrition_meta is present, a nutrient is 'resolved' if its meta status
     is anything other than 'missing'. When nutrition_meta is absent (legacy),
     falls back to checking key presence in the nutrition dict.
+    Guards against non-dict nutrition_meta or non-dict meta entries.
     """
     counts = {}
     for k in keys:
         resolved = 0
         for o in items:
-            meta = o.get("nutrition_meta", {}).get(k)
-            if meta is not None:
+            meta_root = o.get("nutrition_meta")
+            if not isinstance(meta_root, dict):
+                # Legacy fallback: key presence counts as resolved
+                if k in (o.get("nutrition") if isinstance(o.get("nutrition"), dict) else {}):
+                    resolved += 1
+                continue
+            meta = meta_root.get(k)
+            if isinstance(meta, dict):
                 if meta.get("status") != "missing":
                     resolved += 1
-            else:
+            elif meta is None:
                 # Legacy fallback: key presence counts as resolved
-                if k in o.get("nutrition", {}):
+                if k in (o.get("nutrition") if isinstance(o.get("nutrition"), dict) else {}):
                     resolved += 1
+            # non-dict, non-None meta entry: treat as unresolved
         counts[k] = resolved
     return counts
 
 
 def status_breakdown(items, keys):
-    """Count per-status totals across all items for each nutrient key."""
+    """Count per-status totals across all items for each nutrient key.
+    Guards against non-dict nutrition_meta or non-dict meta entries."""
     breakdown = {k: Counter() for k in keys}
     for o in items:
-        meta = o.get("nutrition_meta", {})
+        meta_root = o.get("nutrition_meta")
+        if not isinstance(meta_root, dict):
+            # All keys treated as missing for non-dict meta
+            for k in keys:
+                breakdown[k]["missing"] += 1
+            continue
         for k in keys:
-            m = meta.get(k)
-            if m:
+            m = meta_root.get(k)
+            if isinstance(m, dict):
                 breakdown[k][m.get("status", "unknown")] += 1
-            else:
+            elif m is None:
                 # Legacy: treat present keys as sourced, absent as missing
-                if k in o.get("nutrition", {}):
+                nut = o.get("nutrition")
+                if isinstance(nut, dict) and k in nut:
                     breakdown[k]["sourced"] += 1
                 else:
                     breakdown[k]["missing"] += 1
+            else:
+                # Non-dict meta entry: treat as unknown
+                breakdown[k]["unknown"] += 1
     return breakdown
 
 
 def sodium_outliers(recipes):
     out = []
     for o in recipes:
+        nut = o.get("nutrition")
+        if not isinstance(nut, dict):
+            continue
         sg = o.get("serving_grams") or 100
-        na = o["nutrition"].get("sodium")
+        na = nut.get("sodium")
         if na is None:
             continue
         per100 = na / sg * 100
@@ -317,17 +375,23 @@ def main():
     all_items = foods + recipes
     total_status_counts = Counter()
     for o in all_items:
-        meta = o.get("nutrition_meta", {})
+        meta_root = o.get("nutrition_meta")
+        if not isinstance(meta_root, dict):
+            total_status_counts["missing"] += len(supported_keys)
+            continue
         for k in supported_keys:
-            m = meta.get(k, {})
-            total_status_counts[m.get("status", "missing")] += 1
+            m = meta_root.get(k)
+            if isinstance(m, dict):
+                total_status_counts[m.get("status", "missing")] += 1
+            else:
+                total_status_counts["missing"] += 1
 
     # ---- write report ----
     L = []
     w = L.append
     w(f"# Indian Nutrition Data — Validation Report")
     w("")
-    w(f"_Generated {datetime.date.today().isoformat()} by `scripts/validate_data.py`._")
+    w(f"_Generated by `scripts/validate_data.py`._")
     w("")
     w(f"- **Ingredients (IFCT 2017):** {len(foods)} foods")
     w(f"- **Recipes (INDB 2024.11):** {len(recipes)} dishes "
@@ -425,7 +489,8 @@ def main():
     w("|---|---|---|")
     w("| Structure | HARD | No empty names, valid numbers, no duplicate codes |")
     w("| Anchor accuracy | HARD | IFCT 2017 reference values within ±10% |")
-    w("| Nutrient completeness | HARD | All 34 supported keys present in nutrition + nutrition_meta |")
+    w("| Nutrient completeness | HARD | All {0} supported keys present in nutrition + nutrition_meta |"
+      .format(len(supported_keys)))
     w("| No extra keys | HARD | No unsupported keys in nutrition or nutrition_meta |")
     w("| Status vocabulary | HARD | Only sourced/derived/explicit_zero/estimated/missing |")
     w("| B12 provenance | HARD | Positive B12 requires source + citation + confidence |")
