@@ -48,6 +48,8 @@
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
   import { readBodyStat, tagBodyStats, LENGTH_KEYS } from '../lib/body-stats-unit.js';
   import { suggestFoodsForNutrient } from '../lib/nutrientRecommendations.js';
+  import { summarizeFamilyNutrition } from '../lib/familyNutrition.js';
+  import { currentUser } from '../stores/auth.js';
 
   let addMealIdx = 0;
   let showAddAction = false;
@@ -1016,66 +1018,13 @@
     }
   }
 
-  function getGoalLabel(g) {
-    switch (g) {
-      case 'lose_weight': return 'Lose Weight';
-      case 'gain_muscle': return 'Gain Muscle';
-      case 'pregnancy': return 'Pregnancy';
-      case 'lactation': return 'Lactation';
-      default: return 'Maintain';
-    }
-  }
-
-  $: memberTotals = (() => {
-    const mems = [{ id: 'me', name: 'Myself' }, ...familyMembers];
-    const mt = {};
-    for (const m of mems) mt[m.id] = { calories: 0, proteins: 0, carbohydrates: 0, fat: 0, calcium: 0, iron: 0, 'vitamin-a': 0, 'vitamin-c': 0, 'vitamin-d': 0 };
-    if (entry?.items) {
-      for (const item of entry.items) {
-        const id = item.member_id || 'me';
-        if (mt[id]) {
-          const c = Nutrition.calculate(item);
-          Object.keys(mt[id]).forEach(k => {
-            mt[id][k] += c[k] || 0;
-          });
-        }
-      }
-    }
-    return mt;
-  })();
-
-  $: memberLackingNutrients = (() => {
-    const res = [];
-    const mems = familyMembers.length > 0 ? [{ id: 'me', name: 'Myself (Main User)' }, ...familyMembers] : [];
-    for (const m of mems) {
-      const lacking = [];
-      NUTRIMENTS.forEach(n => {
-        let tgt = null;
-        if (m.id === 'me') {
-           const g = $goals[n.id];
-           if (g && g.isPercent) {
-             const density = { fat: 9, carbohydrates: 4, proteins: 4 }[n.id];
-             const calGoal = $goals.calories?.max ?? $goals.calories?.min ?? 2000;
-             tgt = density ? Math.round(calGoal * (g.max ?? g.min) / 100 / density) : (g.max ?? g.min);
-           } else if (g) {
-             tgt = g.max ?? g.min;
-           }
-        } else if (m.targets && m.targets[n.id] != null) {
-          tgt = m.targets[n.id];
-        }
-        
-        if (tgt) {
-          const cur = memberTotals[m.id][n.id] || 0;
-          const pct = Math.round(cur / tgt * 100);
-          if (pct < 100) {
-            lacking.push({ label: n.label, pct, cur: Math.round(cur), tgt: Math.round(tgt) });
-          }
-        }
-      });
-      res.push({ ...m, lacking });
-    }
-    return res;
-  })();
+  $: familyNutritionSummary = summarizeFamilyNutrition({
+    members: familyMembers,
+    currentUser: $currentUser,
+    goals: $goals,
+    items: entry?.items || [],
+    maxRecommendations: 3,
+  });
 
   $: lackingNutrients = (() => {
     const list = [];
@@ -1334,60 +1283,66 @@
       <FastingWidget />
     {/if}
 
-    <!-- Family Nutrition Dashboard Card -->
+    <!-- Family Nutrition Summary Card -->
     <div class="family-dashboard-card card mb-4">
       <div class="fd-header">
         <div class="fd-title-wrap">
-          <span class="material-symbols-rounded fd-icon">family_restroom</span>
-          <span class="fd-title">Family Nutrition Dashboard</span>
+          <span class="material-symbols-rounded fd-icon" aria-hidden="true">family_restroom</span>
+          <span class="fd-title">Family Nutrition Today</span>
         </div>
-        <button class="fd-manage-btn" on:click={() => push('/family')} title="Manage Family Members">
-          <span class="material-symbols-rounded">settings</span> Manage
+        <button class="fd-manage-btn" on:click={() => push('/nutrients')} title="View nutrient analytics" aria-label="View family nutrient analytics">
+          <span class="material-symbols-rounded" aria-hidden="true">analytics</span> Analytics
         </button>
       </div>
-      
+
       {#if familyMembers.length === 0}
         <div class="fd-empty">
-          <p class="text-3 text-sm mb-3">Add family members (infants, kids, adults) to automatically aggregate daily nutrition targets and track sufficiency scientifically.</p>
-          <button class="primary-btn sm" on:click={() => push('/family')}>
-            <span class="material-symbols-rounded">person_add</span> Add Family Member
+          <p class="text-3 text-sm mb-3">Add family members to plan and track nutrition coverage together.</p>
+          <button class="primary-btn sm" on:click={() => push('/family')} aria-label="Add a family member">
+            <span class="material-symbols-rounded" aria-hidden="true">person_add</span> Add Family Member
           </button>
         </div>
       {:else}
-        <div class="fd-members-col">
-          {#each memberLackingNutrients as m}
-            <div class="fd-member-card" on:click={() => push('/family')} role="button" tabindex="0" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--surface-2); border-radius: var(--radius-md); margin-bottom: 8px; cursor: pointer;">
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <div class="fd-avatar" style="background: var(--accent-dim); color: var(--accent); flex-shrink: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700;">
-                  {m.name[0].toUpperCase()}
-                </div>
-                <div class="fd-member-info" style="flex: 1;">
-                  <span class="fd-member-name" style="font-weight: 600; color: var(--text-1); font-size: 14px;">{m.name}</span>
-                  {#if m.id !== 'me'}
-                    <span class="fd-member-goal" style="display: block; font-size: 11px; color: var(--text-3);">{getGoalLabel(m.goal_type)}</span>
-                  {/if}
-                </div>
-                {#if m.lacking.length === 0}
-                  <div style="color: var(--accent); display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600;">
-                    <span class="material-symbols-rounded" style="font-size: 16px;">check_circle</span> Targets Met
-                  </div>
-                {/if}
-              </div>
-              {#if m.lacking.length > 0}
-                <div class="fd-lacking-list" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;">
-                  {#each m.lacking as lack}
-                    <div style="background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: #f87171; display: flex; align-items: center; gap: 4px;">
-                      <span class="material-symbols-rounded" style="font-size: 12px;">warning</span>
-                      {lack.label}: {lack.cur} / {lack.tgt} ({lack.pct}%)
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/each}
-          <button class="meal-add-row mt-2" on:click={() => push('/family')} style="background: transparent;">
-            <span class="material-symbols-rounded">person_add</span>
-            <span>Add Family Member</span>
+        <div class="fd-summary-grid" aria-label="Family nutrition summary metrics">
+          <div class="fd-metric">
+            <span>Coverage</span>
+            <strong>{familyNutritionSummary.overallCoverage}%</strong>
+          </div>
+          <div class="fd-metric">
+            <span>Meals logged</span>
+            <strong>{familyNutritionSummary.mealsLogged}</strong>
+          </div>
+          <div class="fd-metric">
+            <span>Next action</span>
+            <strong>{familyNutritionSummary.bestNextAction}</strong>
+          </div>
+        </div>
+
+        {#if familyNutritionSummary.recommendations.length > 0}
+          <div class="fd-recommendations" aria-label="Top family nutrition recommendations">
+            {#each familyNutritionSummary.recommendations as row}
+              <button class="fd-recommendation-row" on:click={() => push('/nutrients')} aria-label={`Open nutrient analytics for ${row.label}`}>
+                <span class="fd-recommendation-main">
+                  <strong>{row.label}</strong>
+                  <small>{row.status.label} · {row.affectedLabel}</small>
+                </span>
+                <span class="fd-recommendation-action">{row.foodMove}</span>
+              </button>
+            {/each}
+          </div>
+        {:else}
+          <div class="fd-empty compact" aria-live="polite">
+            <p>{familyNutritionSummary.headline}</p>
+          </div>
+        {/if}
+
+        <div class="fd-actions">
+          <button class="primary-btn sm" on:click={() => push('/planner')} aria-label="Plan next meal">
+            <span class="material-symbols-rounded" aria-hidden="true">restaurant_menu</span> Plan next meal
+          </button>
+          <button class="meal-add-row" on:click={() => push('/family')} aria-label="Manage family members">
+            <span class="material-symbols-rounded" aria-hidden="true">family_restroom</span>
+            <span>Manage family</span>
           </button>
         </div>
       {/if}
@@ -3412,10 +3367,12 @@
     font-size: 12px;
     font-weight: 600;
     color: var(--accent);
-    display: flex;
+    display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
-    padding: 4px 8px;
+    min-height: 44px;
+    padding: 8px 12px;
     border-radius: var(--radius-sm);
     transition: background 0.2s;
   }
@@ -3428,50 +3385,105 @@
   .fd-empty {
     padding: 4px 0;
   }
-  .fd-members-row {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
+  .fd-empty .primary-btn,
+  .fd-actions .primary-btn,
+  .fd-actions .meal-add-row {
+    min-height: 44px;
   }
-  .fd-member-chip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--surface-2);
+  .fd-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .fd-metric {
+    display: grid;
+    gap: 6px;
+    padding: 12px;
     border: 1px solid var(--border);
-    padding: 6px 12px;
-    border-radius: var(--radius-full);
-    cursor: pointer;
-    transition: transform var(--dur-fast), border-color var(--dur-fast);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
   }
-  .fd-member-chip:hover {
-    transform: translateY(-1px);
-    border-color: var(--accent);
-  }
-  .fd-avatar {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
+  .fd-metric span {
+    color: var(--text-3);
+    font-size: 12px;
     font-weight: 700;
   }
-  .fd-member-info {
-    display: flex;
-    flex-direction: column;
-  }
-  .fd-member-name {
-    font-size: 13px;
-    font-weight: 600;
+  .fd-metric strong {
     color: var(--text-1);
-    line-height: 1.2;
+    font-size: 16px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
   }
-  .fd-member-goal {
-    font-size: 10px;
+  .fd-recommendations {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .fd-recommendation-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    min-height: 52px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    color: var(--text-1);
+    padding: 10px 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--dur-fast), transform var(--dur-fast);
+  }
+  .fd-recommendation-row:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .fd-recommendation-main {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+  }
+  .fd-recommendation-row small {
+    display: block;
     color: var(--text-3);
-    line-height: 1.1;
+  }
+  .fd-recommendation-action {
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+  }
+  .fd-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .fd-empty.compact {
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+  }
+  .fd-empty.compact p {
+    margin: 0;
+    color: var(--text-3);
+    font-size: 13px;
+  }
+  @media (max-width: 640px) {
+    .fd-summary-grid {
+      grid-template-columns: 1fr;
+    }
+    .fd-recommendation-row {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+    .fd-recommendation-action {
+      text-align: left;
+    }
   }
 
   /* ─── Diary Nutrient Gap Suggestions ─────────────────────────── */
