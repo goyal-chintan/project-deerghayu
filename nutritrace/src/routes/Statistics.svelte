@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import { portal } from '../lib/portal.js';
@@ -45,6 +45,29 @@
   let summary = null; // { avg, min, max, total, daysWithData }
   let _loadVer = 0;   // cancel stale concurrent loadData calls
   let activeStatsView = 'charts';
+  let chartsTabEl;
+  let nutritionTabEl;
+
+  function selectStatsView(view) {
+    activeStatsView = view;
+  }
+
+  async function handleStatsTabKeydown(event) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+
+    const nextView = event.key === 'Home'
+      ? 'charts'
+      : event.key === 'End'
+        ? 'nutrition'
+        : activeStatsView === 'charts'
+          ? 'nutrition'
+          : 'charts';
+
+    selectStatsView(nextView);
+    await tick();
+    (nextView === 'charts' ? chartsTabEl : nutritionTabEl)?.focus();
+  }
 
   // Cumulative metrics accumulate throughout the day (calories, steps, water, etc.).
   // Excluded from charts by default until the day is complete to avoid trend distortion.
@@ -546,26 +569,28 @@
   <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'}>
     {#if $bannerStyle === 'animated'}<StatsBanner />{/if}
     <h1>{$_('routes.statistics.title')}</h1>
-    <div class="stats-view-switch" role="tablist" aria-label="Statistics view">
+    <div class="stats-view-switch" role="tablist" aria-label="Statistics view" on:keydown={handleStatsTabKeydown}>
       <button
+        bind:this={chartsTabEl}
         class="stats-view-tab"
         class:active={activeStatsView === 'charts'}
         id="statistics-charts-tab"
         role="tab"
         aria-selected={activeStatsView === 'charts'}
-        aria-controls="statistics-charts-panel"
-        on:click={() => activeStatsView = 'charts'}
+        tabindex={activeStatsView === 'charts' ? 0 : -1}
+        on:click={() => selectStatsView('charts')}
       >
         Charts
       </button>
       <button
+        bind:this={nutritionTabEl}
         class="stats-view-tab"
         class:active={activeStatsView === 'nutrition'}
         id="statistics-nutrition-tab"
         role="tab"
         aria-selected={activeStatsView === 'nutrition'}
-        aria-controls="statistics-nutrition-panel"
-        on:click={() => activeStatsView = 'nutrition'}
+        tabindex={activeStatsView === 'nutrition' ? 0 : -1}
+        on:click={() => selectStatsView('nutrition')}
       >
         Nutrition
       </button>

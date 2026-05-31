@@ -10,6 +10,9 @@ test('statistics route offers charts and nutrition segmented views', () => {
   assert.match(source, /role=['"]tablist['"][\s\S]*aria-label=['"]Statistics view['"]/);
   assert.match(source, />\s*Charts\s*</);
   assert.match(source, />\s*Nutrition\s*</);
+  assert.match(source, /on:keydown=\{handleStatsTabKeydown\}/);
+  assert.match(source, /tabindex=\{activeStatsView === ['"]charts['"] \? 0 : -1\}/);
+  assert.match(source, /tabindex=\{activeStatsView === ['"]nutrition['"] \? 0 : -1\}/);
 });
 
 test('statistics route renders charts and nutrition panel in separate views', () => {
