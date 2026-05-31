@@ -71,10 +71,14 @@ try {
       logger.warn(`[seed] Skipped: ${fRes.skipped} foods, ${rRes.skipped} recipes (validation/conflict)`);
     }
     if (fRes.errors.length) {
-      logger.warn(`[seed] Food validation errors (${fRes.errors.length}):`, fRes.errors.slice(0, 5).join('; '));
+      logger.warn(`[seed] Food validation errors (${fRes.errors.length}):`, fRes.errors.slice(0, 3).join(' | '));
     }
     if (rRes.errors.length) {
-      logger.warn(`[seed] Recipe validation errors (${rRes.errors.length}):`, rRes.errors.slice(0, 5).join('; '));
+      logger.warn(`[seed] Recipe validation errors (${rRes.errors.length}):`, rRes.errors.slice(0, 3).join(' | '));
+    }
+    if (rRes.conflicts.length) {
+      const sample = rRes.conflicts.slice(0, 3).map(c => `${c.name} (${c.code})`).join(', ');
+      logger.warn(`[seed] Recipe conflicts (${rRes.conflicts.length}): ${sample}`);
     }
   }
 } catch (e) {

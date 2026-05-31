@@ -141,6 +141,16 @@ describe('seed-core integration', () => {
       assert.equal(result, null);
     });
 
+    it('accepts zero values as valid', () => {
+      const result = validateNutrition(completeNutrition(), 'test');
+      assert.equal(result, null);
+    });
+
+    it('accepts negative numbers (valid finite)', () => {
+      const result = validateNutrition(completeNutrition({ calories: -1 }), 'test');
+      assert.equal(result, null);
+    });
+
     it('rejects missing keys', () => {
       const partial = { calories: 100, proteins: 5 }; // missing most keys
       const result = validateNutrition(partial, 'test');
@@ -162,9 +172,73 @@ describe('seed-core integration', () => {
       assert.ok(validateNutrition(undefined, 'test'));
     });
 
-    it('rejects non-object nutrition', () => {
+    it('rejects non-object nutrition (string, number)', () => {
       assert.ok(validateNutrition('string', 'test'));
       assert.ok(validateNutrition(42, 'test'));
+    });
+
+    it('rejects array as nutrition', () => {
+      assert.ok(validateNutrition([1, 2, 3], 'test'));
+    });
+
+    it('rejects null value for a nutrient key', () => {
+      const result = validateNutrition(completeNutrition({ calories: null }), 'test');
+      assert.ok(result);
+      assert.match(result, /invalid values:/);
+      assert.match(result, /calories/);
+    });
+
+    it('rejects string value for a nutrient key', () => {
+      const result = validateNutrition(completeNutrition({ fat: '3.5' }), 'test');
+      assert.ok(result);
+      assert.match(result, /invalid values:/);
+      assert.match(result, /fat/);
+    });
+
+    it('rejects boolean value for a nutrient key', () => {
+      const result = validateNutrition(completeNutrition({ iron: true }), 'test');
+      assert.ok(result);
+      assert.match(result, /invalid values:/);
+      assert.match(result, /iron/);
+    });
+
+    it('rejects NaN value for a nutrient key', () => {
+      const result = validateNutrition(completeNutrition({ proteins: NaN }), 'test');
+      assert.ok(result);
+      assert.match(result, /invalid values:/);
+      assert.match(result, /proteins/);
+    });
+
+    it('rejects Infinity value for a nutrient key', () => {
+      const result = validateNutrition(completeNutrition({ sodium: Infinity }), 'test');
+      assert.ok(result);
+      assert.match(result, /invalid values:/);
+      assert.match(result, /sodium/);
+    });
+
+    it('rejects -Infinity value for a nutrient key', () => {
+      const result = validateNutrition(completeNutrition({ zinc: -Infinity }), 'test');
+      assert.ok(result);
+      assert.match(result, /invalid values:/);
+      assert.match(result, /zinc/);
+    });
+
+    it('rejects object value for a nutrient key', () => {
+      const result = validateNutrition(completeNutrition({ calcium: { amount: 50 } }), 'test');
+      assert.ok(result);
+      assert.match(result, /invalid values:/);
+      assert.match(result, /calcium/);
+    });
+
+    it('reports multiple invalid values at once', () => {
+      const result = validateNutrition(
+        completeNutrition({ calories: null, fat: 'bad', iron: NaN }),
+        'test'
+      );
+      assert.ok(result);
+      assert.match(result, /calories/);
+      assert.match(result, /fat/);
+      assert.match(result, /iron/);
     });
   });
 
@@ -280,6 +354,26 @@ describe('seed-core integration', () => {
       assert.match(result.errors[0], /extra:.*omega-3/);
     });
 
+    it('rejects foods with invalid nutrient value types', () => {
+      const badValues = [{
+        name: 'Bad Value Food',
+        code: 'TBADV',
+        group: 'Test',
+        diet_type: 'vegetarian',
+        nutrition: completeNutrition({ calories: null, fat: 'string', iron: NaN }),
+      }];
+
+      const result = seedFoods(db, ownerId, badValues);
+      assert.equal(result.inserted, 0);
+      assert.equal(result.skipped, 1);
+      assert.match(result.errors[0], /invalid values:/);
+      assert.match(result.errors[0], /calories/);
+
+      // Verify nothing was written
+      const row = db.prepare(`SELECT id FROM foods WHERE user_id = ? AND barcode = 'TBADV'`).get(ownerId);
+      assert.equal(row, undefined);
+    });
+
     it('is idempotent: re-run updates without inserting duplicates', () => {
       // Modify one nutrition value to prove update works
       const modified = sampleFoods.map(f => {
@@ -337,6 +431,7 @@ describe('seed-core integration', () => {
       assert.equal(result.updated, 0);
       assert.equal(result.skipped, 0);
       assert.deepEqual(result.errors, []);
+      assert.deepEqual(result.conflicts, []);
     });
 
     it('creates rows with correct column values', () => {
@@ -452,6 +547,12 @@ describe('seed-core integration', () => {
       assert.equal(result.updated, 0);
       assert.equal(result.skipped, 1);
 
+      // Verify structured conflict detail
+      assert.equal(result.conflicts.length, 1);
+      assert.equal(result.conflicts[0].name, 'User Dosa Recipe');
+      assert.equal(result.conflicts[0].code, 'TSTCONF');
+      assert.match(result.conflicts[0].reason, /lacks INDB provenance/);
+
       // Verify user's recipe was NOT modified
       const row = db.prepare(
         `SELECT nutrition, notes FROM meals WHERE user_id = ? AND name = 'User Dosa Recipe'`
@@ -506,12 +607,32 @@ describe('seed-core integration', () => {
       const result = seedRecipes(db, ownerId, conflicting);
       assert.equal(result.skipped, 1);
       assert.equal(result.updated, 0);
+      assert.equal(result.conflicts.length, 1);
+      assert.equal(result.conflicts[0].name, 'Null Notes Recipe');
+      assert.equal(result.conflicts[0].code, 'TSTNULL');
 
       // Original unchanged
       const row = db.prepare(
         `SELECT nutrition FROM meals WHERE user_id = ? AND name = 'Null Notes Recipe'`
       ).get(ownerId);
       assert.equal(JSON.parse(row.nutrition).calories, 99);
+    });
+
+    it('rejects recipes with invalid nutrient value types', () => {
+      const badValues = [{
+        name: 'Bad Value Recipe',
+        code: 'TSTBADV',
+        serving_unit: null,
+        serving_grams: null,
+        nutrition: completeNutrition({ proteins: Infinity, sodium: null }),
+      }];
+
+      const result = seedRecipes(db, ownerId, badValues);
+      assert.equal(result.inserted, 0);
+      assert.equal(result.skipped, 1);
+      assert.match(result.errors[0], /invalid values:/);
+      assert.match(result.errors[0], /proteins/);
+      assert.match(result.errors[0], /sodium/);
     });
   });
 });

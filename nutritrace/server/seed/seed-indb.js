@@ -96,11 +96,35 @@ async function main() {
 
   // Seed foods
   const foodResult = seedFoods(db, ownerId, foods);
-  console.log(`Foods: ${foodResult.inserted} inserted / ${foodResult.updated} updated`);
+  console.log(`Foods: ${foodResult.inserted} inserted / ${foodResult.updated} updated / ${foodResult.skipped} skipped`);
 
   // Seed recipes
   const recipeResult = seedRecipes(db, ownerId, recipes);
-  console.log(`Recipes: ${recipeResult.inserted} inserted / ${recipeResult.updated} updated`);
+  console.log(`Recipes: ${recipeResult.inserted} inserted / ${recipeResult.updated} updated / ${recipeResult.skipped} skipped`);
+
+  // Report validation errors
+  const allErrors = [...foodResult.errors, ...recipeResult.errors];
+  if (allErrors.length) {
+    console.error(`\nValidation errors (${allErrors.length}):`);
+    for (const e of allErrors.slice(0, 10)) console.error(`  • ${e}`);
+    if (allErrors.length > 10) console.error(`  ... and ${allErrors.length - 10} more`);
+  }
+
+  // Report recipe conflicts (user-owned same-name rows)
+  if (recipeResult.conflicts.length) {
+    console.warn(`\nRecipe conflicts (${recipeResult.conflicts.length} skipped — user recipes with same name):`);
+    for (const c of recipeResult.conflicts.slice(0, 10)) {
+      console.warn(`  • "${c.name}" (${c.code}): ${c.reason}`);
+    }
+    if (recipeResult.conflicts.length > 10) {
+      console.warn(`  ... and ${recipeResult.conflicts.length - 10} more`);
+    }
+  }
+
+  if (allErrors.length) {
+    console.error('\nDone with validation errors. Fix seed data and re-run.');
+    process.exit(2);
+  }
 
   console.log('Done.');
 }

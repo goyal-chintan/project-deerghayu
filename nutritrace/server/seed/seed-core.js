@@ -34,7 +34,10 @@ const VALID_DIET_TYPES = ['vegetarian', 'non-vegetarian', 'vegan', 'eggetarian']
 const INDB_PROVENANCE_RE = /INDB 2024\.11, code \S+/;
 
 /**
- * Validate that a nutrition object contains exactly the supported nutrient keys.
+ * Validate that a nutrition object contains exactly the supported nutrient keys,
+ * and that every value is a finite number (rejects null, undefined, NaN, Infinity,
+ * booleans, strings, objects).
+ *
  * Returns null if valid, or an error string describing the problem.
  *
  * @param {object} nutrition — nutrition object from seed record
@@ -42,35 +45,39 @@ const INDB_PROVENANCE_RE = /INDB 2024\.11, code \S+/;
  * @returns {string|null}
  */
 export function validateNutrition(nutrition, label) {
-  if (!nutrition || typeof nutrition !== 'object') {
+  if (!nutrition || typeof nutrition !== 'object' || Array.isArray(nutrition)) {
     return `${label}: nutrition is missing or not an object`;
   }
   const keys = Object.keys(nutrition);
   const missing = SUPPORTED_NUTRIENT_IDS.filter(id => !(id in nutrition));
   const extra = keys.filter(k => !SUPPORTED_SET.has(k));
+  const invalid = SUPPORTED_NUTRIENT_IDS.filter(id =>
+    id in nutrition && (typeof nutrition[id] !== 'number' || !Number.isFinite(nutrition[id]))
+  );
 
-  if (missing.length || extra.length) {
+  if (missing.length || extra.length || invalid.length) {
     const parts = [];
     if (missing.length) parts.push(`missing: ${missing.join(', ')}`);
     if (extra.length) parts.push(`extra: ${extra.join(', ')}`);
+    if (invalid.length) parts.push(`invalid values: ${invalid.join(', ')}`);
     return `${label}: ${parts.join('; ')}`;
   }
   return null;
 }
 
 /**
- * Extract only the numeric nutrition keys from a record, explicitly excluding
- * `nutrition_meta` or any non-supported keys that might be in the source JSON.
- * Returns a clean object with exactly the supported nutrient IDs.
+ * Extract only the supported nutrient keys from a validated record.
+ * Must be called AFTER validateNutrition() passes — copies values directly
+ * without coercion. Excludes `nutrition_meta` and any unsupported keys.
  *
- * @param {object} record — seed data record with .nutrition (and possibly .nutrition_meta)
+ * @param {object} record — seed data record with .nutrition (already validated)
  * @returns {object} — clean nutrition object for DB storage
  */
 function extractNutrition(record) {
-  const source = record.nutrition || {};
+  const source = record.nutrition;
   const clean = {};
   for (const id of SUPPORTED_NUTRIENT_IDS) {
-    clean[id] = source[id] ?? 0;
+    clean[id] = source[id];
   }
   return clean;
 }
@@ -93,7 +100,7 @@ export function seedFoods(db, ownerId, foods) {
   }
 
   const findExisting = db.prepare(
-    `SELECT id, notes FROM foods WHERE user_id = ? AND barcode = ?`
+    `SELECT id FROM foods WHERE user_id = ? AND barcode = ?`
   );
 
   const insertStmt = db.prepare(`
@@ -176,7 +183,7 @@ export function seedFoods(db, ownerId, foods) {
  * @param {import('better-sqlite3').Database} db
  * @param {number} ownerId — user_id to own these recipes
  * @param {Array} recipes — array of INDB recipe objects from indb-recipes.json
- * @returns {{inserted: number, updated: number, skipped: number, errors: string[]}}
+ * @returns {{inserted: number, updated: number, skipped: number, errors: string[], conflicts: Array<{name: string, code: string, reason: string}>}}
  */
 export function seedRecipes(db, ownerId, recipes) {
   if (!ownerId && ownerId !== 0) {
@@ -203,6 +210,7 @@ export function seedRecipes(db, ownerId, recipes) {
   let updated = 0;
   let skipped = 0;
   const errors = [];
+  const conflicts = [];
 
   const run = db.transaction(() => {
     for (const recipe of recipes) {
@@ -232,6 +240,7 @@ export function seedRecipes(db, ownerId, recipes) {
         // Conflict protection: only update if existing row has INDB provenance
         if (!existing.notes || !INDB_PROVENANCE_RE.test(existing.notes)) {
           // User-created recipe with same name — do not overwrite
+          conflicts.push({ name, code: recipe.code, reason: 'existing recipe lacks INDB provenance' });
           skipped++;
           continue;
         }
@@ -245,5 +254,5 @@ export function seedRecipes(db, ownerId, recipes) {
   });
 
   run();
-  return { inserted, updated, skipped, errors };
+  return { inserted, updated, skipped, errors, conflicts };
 }
