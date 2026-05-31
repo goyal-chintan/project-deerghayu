@@ -5,8 +5,20 @@ _Generated 2026-05-31 by `scripts/validate_data.py`._
 - **Ingredients (IFCT 2017):** 542 foods
 - **Recipes (INDB 2024.11):** 984 dishes (81 use per-100g fallback; rest per realistic serving)
 - **Quarantined at conversion:** 30 recipes (energy/macro contradiction) + 1 sodium field — see below
+- **Supported nutrients:** 34 (from `supported-nutrient-ids.json`)
 - **Accuracy bar:** ±10% vs IFCT 2017 published values on anchor foods
 - **Gate result:** ✅ PASS (0 hard issues)
+
+## Provenance status summary (all items × all nutrients)
+
+| Status | Count | % |
+|---|--:|--:|
+| sourced | 38324 | 73.9% |
+| derived | 3022 | 5.8% |
+| explicit_zero | 3960 | 7.6% |
+| estimated | 91 | 0.2% |
+| missing | 6487 | 12.5% |
+| **total** | **51884** | **100%** |
 
 ## Anchor accuracy (IFCT 2017 published vs converted)
 
@@ -47,13 +59,12 @@ Stated calories vs 4·carb + 4·protein + 9·fat. Drift is expected from fiber, 
 
 ## Nutrient coverage (resolved provenance)
 
-Counts entries with `nutrition_meta.status` ≠ `missing` — i.e. sourced, derived, explicit_zero, or estimated. Missing = unresolved placeholder.
+Counts entries with `nutrition_meta.status` ≠ `missing` — i.e. sourced, derived, explicit_zero, or estimated. Missing = scientifically honest placeholder where no defensible value exists.
 
 | Nutrient | IFCT resolved | INDB resolved | IFCT missing | INDB missing |
 |---|--:|--:|--:|--:|
 | calories | 528 / 542 | 984 / 984 | 14 | 0 |
 | kilojoules | 528 / 542 | 984 / 984 | 14 | 0 |
-| proteins | 528 / 542 | 983 / 984 | 14 | 1 |
 | fat | 542 / 542 | 982 / 984 | 0 | 2 |
 | saturated-fat | 523 / 542 | 981 / 984 | 19 | 3 |
 | trans-fat | 2 / 542 | 0 / 984 | 540 | 984 |
@@ -66,15 +77,13 @@ Counts entries with `nutrition_meta.status` ≠ `missing` — i.e. sourced, deri
 | fiber | 306 / 542 | 933 / 984 | 236 | 51 |
 | sugars | 314 / 542 | 983 / 984 | 228 | 1 |
 | added-sugars | 299 / 542 | 0 / 984 | 243 | 984 |
+| proteins | 528 / 542 | 983 / 984 | 14 | 1 |
+| vitamin-d | 498 / 542 | 945 / 984 | 44 | 39 |
 | calcium | 527 / 542 | 983 / 984 | 15 | 1 |
 | iron | 527 / 542 | 983 / 984 | 15 | 1 |
 | potassium | 528 / 542 | 983 / 984 | 14 | 1 |
-| magnesium | 527 / 542 | 983 / 984 | 15 | 1 |
-| zinc | 528 / 542 | 983 / 984 | 14 | 1 |
-| phosphorus | 527 / 542 | 983 / 984 | 15 | 1 |
 | vitamin-a | 481 / 542 | 618 / 984 | 61 | 366 |
 | vitamin-c | 229 / 542 | 885 / 984 | 313 | 99 |
-| vitamin-d | 498 / 542 | 945 / 984 | 44 | 39 |
 | vitamin-e | 524 / 542 | 979 / 984 | 18 | 5 |
 | vitamin-k | 519 / 542 | 969 / 984 | 23 | 15 |
 | b1 | 522 / 542 | 982 / 984 | 20 | 2 |
@@ -83,10 +92,54 @@ Counts entries with `nutrition_meta.status` ≠ `missing` — i.e. sourced, deri
 | b6 | 528 / 542 | 981 / 984 | 14 | 3 |
 | b9 | 347 / 542 | 979 / 984 | 195 | 5 |
 | b12 | 399 / 542 | 44 / 984 | 143 | 940 |
+| magnesium | 527 / 542 | 983 / 984 | 15 | 1 |
+| zinc | 528 / 542 | 983 / 984 | 14 | 1 |
+| phosphorus | 527 / 542 | 983 / 984 | 15 | 1 |
 | caffeine | 542 / 542 | 946 / 984 | 0 | 38 |
 | alcohol | 541 / 542 | 983 / 984 | 1 | 1 |
 
-### Status breakdown (nutrients with >10% missing)
+### Per-nutrient status breakdown
+
+| Nutrient | sourced | derived | explicit_zero | estimated | missing |
+|---|--:|--:|--:|--:|--:|
+| calories | 1512 | 0 | 0 | 0 | 14 |
+| kilojoules | 0 | 1512 | 0 | 0 | 14 |
+| fat | 1524 | 0 | 0 | 0 | 2 |
+| saturated-fat | 1504 | 0 | 0 | 0 | 22 |
+| trans-fat | 2 | 0 | 0 | 0 | 1524 |
+| polyunsaturated-fat | 1504 | 0 | 0 | 0 | 22 |
+| monounsaturated-fat | 1502 | 0 | 0 | 0 | 24 |
+| cholesterol | 832 | 0 | 323 | 0 | 371 |
+| sodium | 1510 | 0 | 0 | 0 | 16 |
+| salt | 0 | 1510 | 0 | 0 | 16 |
+| carbohydrates | 1296 | 0 | 0 | 0 | 230 |
+| fiber | 1239 | 0 | 0 | 0 | 287 |
+| sugars | 1297 | 0 | 0 | 0 | 229 |
+| added-sugars | 0 | 0 | 299 | 0 | 1227 |
+| proteins | 1511 | 0 | 0 | 0 | 15 |
+| vitamin-d | 1443 | 0 | 0 | 0 | 83 |
+| calcium | 1510 | 0 | 0 | 0 | 16 |
+| iron | 1510 | 0 | 0 | 0 | 16 |
+| potassium | 1511 | 0 | 0 | 0 | 15 |
+| vitamin-a | 1099 | 0 | 0 | 0 | 427 |
+| vitamin-c | 1114 | 0 | 0 | 0 | 412 |
+| vitamin-e | 1503 | 0 | 0 | 0 | 23 |
+| vitamin-k | 1488 | 0 | 0 | 0 | 38 |
+| b1 | 1504 | 0 | 0 | 0 | 22 |
+| b2 | 1508 | 0 | 0 | 0 | 18 |
+| b3 | 1509 | 0 | 0 | 0 | 17 |
+| b6 | 1509 | 0 | 0 | 0 | 17 |
+| b9 | 1326 | 0 | 0 | 0 | 200 |
+| b12 | 26 | 0 | 326 | 91 | 1083 |
+| magnesium | 1510 | 0 | 0 | 0 | 16 |
+| zinc | 1511 | 0 | 0 | 0 | 15 |
+| phosphorus | 1510 | 0 | 0 | 0 | 16 |
+| caffeine | 0 | 0 | 1488 | 0 | 38 |
+| alcohol | 0 | 0 | 1524 | 0 | 2 |
+
+### Unresolved missing (>10% of dataset)
+
+These remain `missing` because no defensible source exists. The gate accepts scientifically honest missing statuses.
 
 | Nutrient | Dataset | sourced | derived | explicit_zero | estimated | missing |
 |---|---|--:|--:|--:|--:|--:|
@@ -105,6 +158,20 @@ Counts entries with `nutrition_meta.status` ≠ `missing` — i.e. sourced, deri
 | b9 | IFCT | 347 | 0 | 0 | 0 | 195 |
 | b12 | IFCT | 26 | 0 | 323 | 50 | 143 |
 | b12 | INDB | 0 | 0 | 3 | 41 | 940 |
+
+## Validation checks performed
+
+| Check | Type | Description |
+|---|---|---|
+| Structure | HARD | No empty names, valid numbers, no duplicate codes |
+| Anchor accuracy | HARD | IFCT 2017 reference values within ±10% |
+| Nutrient completeness | HARD | All 34 supported keys present in nutrition + nutrition_meta |
+| No extra keys | HARD | No unsupported keys in nutrition or nutrition_meta |
+| Status vocabulary | HARD | Only sourced/derived/explicit_zero/estimated/missing |
+| B12 provenance | HARD | Positive B12 requires source + citation + confidence |
+| Zero provenance | HARD | Zero values with non-missing status must have source |
+| Atwater drift | SOFT | Energy vs macro cross-check (>25% flagged) |
+| Sodium outliers | SOFT | Reports high-sodium items for review |
 
 ## Known limitations
 

@@ -5,21 +5,33 @@ datasets. Verifies the committed JSON (ifct-foods.json, indb-recipes.json)
 BEFORE it can be seeded, and writes a human-reviewable report to
 server/seed/data/VALIDATION.md.
 
-Exits non-zero on any HARD failure (structural corruption or an IFCT anchor
-food outside the ±10% accuracy tolerance), so it can run in CI / pre-seed.
-Soft signals (Atwater energy drift, sodium outliers, coverage gaps) are
-reported but do not fail the gate.
+Exits non-zero on any HARD failure:
+- Structural corruption
+- IFCT anchor food outside ±10% accuracy tolerance
+- Missing supported nutrient key in nutrition or nutrition_meta
+- Unsupported extra nutrient keys
+- Invalid status vocabulary in nutrition_meta
+- B12 positive value without source/citation/confidence
+- Zero value with non-missing status lacking proper provenance
+
+Soft signals (Atwater energy drift, sodium outliers, scientifically honest
+`missing` statuses) are reported but do not fail the gate.
 """
 import os, json, math, sys, datetime
+from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "..", "server", "seed", "data")
 IFCT = os.path.join(DATA, "ifct-foods.json")
 INDB = os.path.join(DATA, "indb-recipes.json")
 QUARANTINE = os.path.join(DATA, "indb-quarantine.json")
+SUPPORTED_IDS = os.path.join(DATA, "supported-nutrient-ids.json")
 REPORT = os.path.join(DATA, "VALIDATION.md")
 
 TOL = 0.10  # ±10% accuracy bar vs IFCT 2017 published values
+
+# Valid status vocabulary for nutrition_meta entries
+VALID_STATUSES = {"sourced", "derived", "explicit_zero", "estimated", "missing"}
 
 # IFCT 2017 (ICMR-NIN) PUBLISHED per-100g reference values, transcribed from
 # the printed tables, used as an EXTERNAL check that unit conversion is correct.
@@ -72,6 +84,91 @@ def check_structure(items, kind):
     dupes = {c: n for c, n in seen_codes.items() if len(n) > 1}
     for c, n in dupes.items():
         fails.append(f"{kind}: duplicate code {c} -> {n}")
+    return fails
+
+
+def check_nutrient_completeness(items, kind, supported_keys):
+    """HARD: every row must have ALL supported keys in nutrition and nutrition_meta.
+    Also rejects unsupported extra keys."""
+    fails = []
+    supported_set = set(supported_keys)
+    for i, o in enumerate(items):
+        tag = f"{kind}[{i}] {o.get('name','?')!r}"
+        nut = o.get("nutrition", {})
+        meta = o.get("nutrition_meta", {})
+
+        # Check missing supported keys in nutrition
+        missing_nut = supported_set - set(nut.keys())
+        if missing_nut:
+            fails.append(f"{tag}: missing nutrition keys: {sorted(missing_nut)}")
+
+        # Check missing supported keys in nutrition_meta
+        missing_meta = supported_set - set(meta.keys())
+        if missing_meta:
+            fails.append(f"{tag}: missing nutrition_meta keys: {sorted(missing_meta)}")
+
+        # Check unsupported extra keys in nutrition
+        extra_nut = set(nut.keys()) - supported_set
+        if extra_nut:
+            fails.append(f"{tag}: unsupported nutrition keys: {sorted(extra_nut)}")
+
+        # Check unsupported extra keys in nutrition_meta
+        extra_meta = set(meta.keys()) - supported_set
+        if extra_meta:
+            fails.append(f"{tag}: unsupported nutrition_meta keys: {sorted(extra_meta)}")
+    return fails
+
+
+def check_status_vocabulary(items, kind):
+    """HARD: all nutrition_meta statuses must use valid vocabulary."""
+    fails = []
+    for i, o in enumerate(items):
+        tag = f"{kind}[{i}] {o.get('name','?')!r}"
+        meta = o.get("nutrition_meta", {})
+        for k, m in meta.items():
+            status = m.get("status")
+            if status not in VALID_STATUSES:
+                fails.append(f"{tag}: invalid status {status!r} for {k}")
+    return fails
+
+
+def check_b12_provenance(items, kind):
+    """HARD: B12-positive values must have source + citation + confidence."""
+    fails = []
+    for i, o in enumerate(items):
+        b12_val = o.get("nutrition", {}).get("b12", 0)
+        if b12_val > 0:
+            tag = f"{kind}[{i}] {o.get('name','?')!r}"
+            meta = o.get("nutrition_meta", {}).get("b12", {})
+            missing_fields = []
+            if not meta.get("source"):
+                missing_fields.append("source")
+            if not meta.get("citation"):
+                missing_fields.append("citation")
+            if meta.get("confidence") is None:
+                missing_fields.append("confidence")
+            if missing_fields:
+                fails.append(f"{tag}: B12={b12_val} lacks {missing_fields}")
+    return fails
+
+
+def check_zero_provenance(items, kind):
+    """HARD: zero values with non-missing status must have proper provenance.
+    A zero value with status != 'missing' needs at least a source field.
+    explicit_zero specifically must have a source explaining why zero."""
+    fails = []
+    for i, o in enumerate(items):
+        tag = f"{kind}[{i}] {o.get('name','?')!r}"
+        nut = o.get("nutrition", {})
+        meta = o.get("nutrition_meta", {})
+        for k, v in nut.items():
+            if v == 0:
+                m = meta.get(k, {})
+                status = m.get("status", "missing")
+                if status == "missing":
+                    continue  # missing status is fine for zeros
+                if not m.get("source"):
+                    fails.append(f"{tag}: {k}=0 status={status!r} but no source")
     return fails
 
 
@@ -145,7 +242,6 @@ def coverage(items, keys):
 
 def status_breakdown(items, keys):
     """Count per-status totals across all items for each nutrient key."""
-    from collections import Counter
     breakdown = {k: Counter() for k in keys}
     for o in items:
         meta = o.get("nutrition_meta", {})
@@ -179,33 +275,52 @@ def sodium_outliers(recipes):
 def main():
     foods = load(IFCT)
     recipes = load(INDB)
+    supported_keys = load(SUPPORTED_IDS)
     quar = load(QUARANTINE) if os.path.exists(QUARANTINE) else {}
     q_contra = quar.get("energy_macro_contradiction", [])
     q_sodium = quar.get("implausible_sodium_dropped", [])
 
     hard = []
+    # Structural checks (existing)
     hard += check_structure(foods, "food")
     hard += check_structure(recipes, "recipe")
     anchor_fails, anchor_rows = check_anchors(foods)
     hard += anchor_fails
 
+    # Nutrient completeness: every row must have all supported keys
+    hard += check_nutrient_completeness(foods, "food", supported_keys)
+    hard += check_nutrient_completeness(recipes, "recipe", supported_keys)
+
+    # Status vocabulary: only valid statuses allowed
+    hard += check_status_vocabulary(foods, "food")
+    hard += check_status_vocabulary(recipes, "recipe")
+
+    # B12 provenance: positive values require source + citation + confidence
+    hard += check_b12_provenance(foods, "food")
+    hard += check_b12_provenance(recipes, "recipe")
+
+    # Zero provenance: non-missing zeros must have a source
+    hard += check_zero_provenance(foods, "food")
+    hard += check_zero_provenance(recipes, "recipe")
+
     f_checked, f_over, f_worst = atwater_drift(foods)
     r_checked, r_over, r_worst = atwater_drift(recipes)
 
-    APP_KEYS = ["calories", "kilojoules", "proteins", "fat", "saturated-fat",
-                "trans-fat", "polyunsaturated-fat", "monounsaturated-fat",
-                "cholesterol", "sodium", "salt", "carbohydrates", "fiber",
-                "sugars", "added-sugars", "calcium", "iron", "potassium",
-                "magnesium", "zinc", "phosphorus", "vitamin-a", "vitamin-c",
-                "vitamin-d", "vitamin-e", "vitamin-k",
-                "b1", "b2", "b3", "b6", "b9", "b12",
-                "caffeine", "alcohol"]
-    fcov = coverage(foods, APP_KEYS)
-    rcov = coverage(recipes, APP_KEYS)
-    fbd = status_breakdown(foods, APP_KEYS)
-    rbd = status_breakdown(recipes, APP_KEYS)
+    fcov = coverage(foods, supported_keys)
+    rcov = coverage(recipes, supported_keys)
+    fbd = status_breakdown(foods, supported_keys)
+    rbd = status_breakdown(recipes, supported_keys)
     na_out = sodium_outliers(recipes)
     fallback = sum(1 for o in recipes if o.get("basis") == "per_100g")
+
+    # ---- per-nutrient status counts (aggregate) ----
+    all_items = foods + recipes
+    total_status_counts = Counter()
+    for o in all_items:
+        meta = o.get("nutrition_meta", {})
+        for k in supported_keys:
+            m = meta.get(k, {})
+            total_status_counts[m.get("status", "missing")] += 1
 
     # ---- write report ----
     L = []
@@ -219,8 +334,20 @@ def main():
       f"({fallback} use per-100g fallback; rest per realistic serving)")
     w(f"- **Quarantined at conversion:** {len(q_contra)} recipes (energy/macro "
       f"contradiction) + {len(q_sodium)} sodium field{'s' if len(q_sodium) != 1 else ''} — see below")
+    w(f"- **Supported nutrients:** {len(supported_keys)} (from `supported-nutrient-ids.json`)")
     w(f"- **Accuracy bar:** ±{int(TOL*100)}% vs IFCT 2017 published values on anchor foods")
     w(f"- **Gate result:** {'❌ FAIL' if hard else '✅ PASS'} ({len(hard)} hard issues)")
+    w("")
+    w("## Provenance status summary (all items × all nutrients)")
+    w("")
+    w("| Status | Count | % |")
+    w("|---|--:|--:|")
+    total_cells = len(all_items) * len(supported_keys)
+    for status in ["sourced", "derived", "explicit_zero", "estimated", "missing"]:
+        cnt = total_status_counts.get(status, 0)
+        pct = cnt / total_cells * 100 if total_cells else 0
+        w(f"| {status} | {cnt} | {pct:.1f}% |")
+    w(f"| **total** | **{total_cells}** | **100%** |")
     w("")
     w("## Anchor accuracy (IFCT 2017 published vs converted)")
     w("")
@@ -248,23 +375,37 @@ def main():
     w("## Nutrient coverage (resolved provenance)")
     w("")
     w("Counts entries with `nutrition_meta.status` ≠ `missing` — i.e. sourced, "
-      "derived, explicit_zero, or estimated. Missing = unresolved placeholder.")
+      "derived, explicit_zero, or estimated. Missing = scientifically honest "
+      "placeholder where no defensible value exists.")
     w("")
     w("| Nutrient | IFCT resolved | INDB resolved | IFCT missing | INDB missing |")
     w("|---|--:|--:|--:|--:|")
-    for k in APP_KEYS:
+    for k in supported_keys:
         fm = fbd[k].get("missing", 0)
         rm = rbd[k].get("missing", 0)
         w(f"| {k} | {fcov[k]} / {len(foods)} | {rcov[k]} / {len(recipes)} "
           f"| {fm} | {rm} |")
     w("")
-    # Status breakdown summary for nutrients with significant missing counts
+    # Per-nutrient status breakdown
+    w("### Per-nutrient status breakdown")
+    w("")
+    w("| Nutrient | sourced | derived | explicit_zero | estimated | missing |")
+    w("|---|--:|--:|--:|--:|--:|")
+    for k in supported_keys:
+        s = fbd[k] + rbd[k]  # Counter addition
+        w(f"| {k} | {s.get('sourced',0)} | {s.get('derived',0)} "
+          f"| {s.get('explicit_zero',0)} | {s.get('estimated',0)} | {s.get('missing',0)} |")
+    w("")
+    # Highlight nutrients with significant missing counts
     sig_missing = [(k, fbd[k].get("missing", 0), rbd[k].get("missing", 0))
-                   for k in APP_KEYS
+                   for k in supported_keys
                    if fbd[k].get("missing", 0) > len(foods)*0.1
                    or rbd[k].get("missing", 0) > len(recipes)*0.1]
     if sig_missing:
-        w("### Status breakdown (nutrients with >10% missing)")
+        w("### Unresolved missing (>10% of dataset)")
+        w("")
+        w("These remain `missing` because no defensible source exists. "
+          "The gate accepts scientifically honest missing statuses.")
         w("")
         w("| Nutrient | Dataset | sourced | derived | explicit_zero | estimated | missing |")
         w("|---|---|--:|--:|--:|--:|--:|")
@@ -278,6 +419,20 @@ def main():
                 w(f"| {k} | INDB | {bd.get('sourced',0)} | {bd.get('derived',0)} "
                   f"| {bd.get('explicit_zero',0)} | {bd.get('estimated',0)} | {bd.get('missing',0)} |")
         w("")
+    w("## Validation checks performed")
+    w("")
+    w("| Check | Type | Description |")
+    w("|---|---|---|")
+    w("| Structure | HARD | No empty names, valid numbers, no duplicate codes |")
+    w("| Anchor accuracy | HARD | IFCT 2017 reference values within ±10% |")
+    w("| Nutrient completeness | HARD | All 34 supported keys present in nutrition + nutrition_meta |")
+    w("| No extra keys | HARD | No unsupported keys in nutrition or nutrition_meta |")
+    w("| Status vocabulary | HARD | Only sourced/derived/explicit_zero/estimated/missing |")
+    w("| B12 provenance | HARD | Positive B12 requires source + citation + confidence |")
+    w("| Zero provenance | HARD | Zero values with non-missing status must have source |")
+    w("| Atwater drift | SOFT | Energy vs macro cross-check (>25% flagged) |")
+    w("| Sodium outliers | SOFT | Reports high-sodium items for review |")
+    w("")
     w("## Known limitations")
     w("")
     w("- **Vitamin B12** — absent from both IFCT and INDB source columns; "
@@ -336,7 +491,9 @@ def main():
 
     print(f"Wrote {REPORT}")
     print(f"Foods={len(foods)} Recipes={len(recipes)} "
+          f"Nutrients={len(supported_keys)} "
           f"AnchorRows={len(anchor_rows)} HardIssues={len(hard)}")
+    print(f"Status counts: {dict(total_status_counts)}")
     if hard:
         print("HARD FAILURES:")
         for h in hard[:20]:
