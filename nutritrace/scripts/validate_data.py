@@ -127,7 +127,6 @@ def coverage(items, keys):
     is anything other than 'missing'. When nutrition_meta is absent (legacy),
     falls back to checking key presence in the nutrition dict.
     """
-    tot = len(items)
     counts = {}
     for k in keys:
         resolved = 0
@@ -288,10 +287,11 @@ def main():
       "with citations, and remaining items (non-vegetarian foods without a "
       "defensible proxy, most INDB recipes) stay `missing`. The app shows B12 "
       "RDA targets; unresolved `missing` entries will read as unmet.")
-    w("- **Sodium outliers:** the converter drops sodium from ~23 INDB soup/sauce "
-      "rows whose source value exceeded 8000 mg/100g (physically impossible). "
-      f"{len(na_out)} remaining recipes still report >{int(SODIUM_REPORT_FLOOR)} "
-      "mg/100g — high but within INDB's published data; listed below for review.")
+    w(f"- **Sodium outliers:** the converter dropped sodium from {len(q_sodium)} "
+      f"INDB row(s) whose source value exceeded 8000 mg/100g (physically "
+      f"impossible). {len(na_out)} remaining recipes still report "
+      f">{int(SODIUM_REPORT_FLOOR)} mg/100g — high but within INDB's published "
+      f"data; listed below for review.")
     w("- **Per-100g fallback:** {0} condiment-type recipes (jams/sauces/etc.) "
       "have no defined Indian serving in INDB, so their values are per 100 g."
       .format(fallback))

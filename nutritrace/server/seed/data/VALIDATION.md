@@ -109,7 +109,7 @@ Counts entries with `nutrition_meta.status` ≠ `missing` — i.e. sourced, deri
 ## Known limitations
 
 - **Vitamin B12** — absent from both IFCT and INDB source columns; provenance is now mixed via supplement rules: plant foods carry `explicit_zero` (biochemically cannot contain B12), dairy/egg/meat/fish items have `sourced` or `estimated` values from USDA SR Legacy proxies with citations, and remaining items (non-vegetarian foods without a defensible proxy, most INDB recipes) stay `missing`. The app shows B12 RDA targets; unresolved `missing` entries will read as unmet.
-- **Sodium outliers:** the converter drops sodium from ~23 INDB soup/sauce rows whose source value exceeded 8000 mg/100g (physically impossible). 16 remaining recipes still report >2000 mg/100g — high but within INDB's published data; listed below for review.
+- **Sodium outliers:** the converter dropped sodium from 1 INDB row(s) whose source value exceeded 8000 mg/100g (physically impossible). 16 remaining recipes still report >2000 mg/100g — high but within INDB's published data; listed below for review.
 - **Per-100g fallback:** 81 condiment-type recipes (jams/sauces/etc.) have no defined Indian serving in INDB, so their values are per 100 g.
 - Trace nutrients without an app field (copper, selenium, manganese, B5, biotin, carotenoids) are intentionally not carried over.
 
