@@ -208,18 +208,28 @@ def check_zero_provenance(items, kind):
 
 
 def check_anchors(foods):
-    """HARD accuracy gate: anchor foods must be within ±10% of IFCT 2017."""
-    by_name = {o["name"].lower(): o for o in foods}
+    """HARD accuracy gate: anchor foods must be within ±10% of IFCT 2017.
+    Guards against non-dict nutrition on anchor rows."""
+    by_name = {o["name"].lower(): o for o in foods if (o.get("name") or "")}
     fails, rows = [], []
     for name, expect in ANCHORS.items():
         o = by_name.get(name.lower())
         if not o:
             fails.append(f"anchor missing: {name!r}")
             continue
+        nut = o.get("nutrition")
+        if not isinstance(nut, dict):
+            fails.append(f"anchor {name!r}: nutrition is not a dict "
+                         f"(got {type(nut).__name__})")
+            continue
         for key, exp in expect.items():
-            got = o["nutrition"].get(key)
+            got = nut.get(key)
             if got is None:
                 fails.append(f"anchor {name!r}: missing {key}")
+                continue
+            if not isinstance(got, (int, float)):
+                fails.append(f"anchor {name!r}: {key} is not numeric "
+                             f"(got {type(got).__name__})")
                 continue
             dev = abs(got - exp) / exp if exp else 0
             ok = dev <= TOL
@@ -230,19 +240,32 @@ def check_anchors(foods):
     return fails, rows
 
 
+def _safe_num(v):
+    """Return v if it's a finite non-negative number, else 0."""
+    if isinstance(v, bool):
+        return 0
+    if isinstance(v, (int, float)) and math.isfinite(v):
+        return v
+    return 0
+
+
 def atwater_drift(items):
     """SOFT: compare stated calories to 4*carb+4*protein+9*fat. Returns
-    (count_checked, count_over_25pct, worst[list])."""
+    (count_checked, count_over_25pct, worst[list]).
+    Skips rows with non-dict nutrition or non-numeric values."""
     worst = []
     checked = over = 0
     for o in items:
         n = o.get("nutrition")
         if not isinstance(n, dict):
             continue
-        kcal = n.get("calories")
-        if not kcal or kcal <= 0:
+        kcal = _safe_num(n.get("calories"))
+        if kcal <= 0:
             continue
-        pred = 4*n.get("carbohydrates", 0) + 4*n.get("proteins", 0) + 9*n.get("fat", 0)
+        carb = _safe_num(n.get("carbohydrates"))
+        prot = _safe_num(n.get("proteins"))
+        fat = _safe_num(n.get("fat"))
+        pred = 4*carb + 4*prot + 9*fat
         if pred <= 0:
             continue
         checked += 1
@@ -314,6 +337,8 @@ def status_breakdown(items, keys):
 
 
 def sodium_outliers(recipes):
+    """SOFT: flag recipes with very high sodium per 100g.
+    Skips rows with non-dict nutrition or non-numeric sodium."""
     out = []
     for o in recipes:
         nut = o.get("nutrition")
@@ -321,7 +346,7 @@ def sodium_outliers(recipes):
             continue
         sg = o.get("serving_grams") or 100
         na = nut.get("sodium")
-        if na is None:
+        if not isinstance(na, (int, float)) or isinstance(na, bool):
             continue
         per100 = na / sg * 100
         if per100 >= SODIUM_REPORT_FLOOR:
