@@ -83,7 +83,7 @@ def num(v):
         return None
 
 
-# Physiological plausibility cap (per 100 g). A handful of INDB soup/sauce rows
+# Physiological plausibility cap (per 100 g). A small number of INDB rows
 # carry impossible sodium (>8 g/100 g; seawater is ~1.1 g, soy sauce ~6 g) —
 # clearly a source error. We drop ONLY the offending sodium value (keeping each
 # recipe's valid macros) so RDA tracking isn't poisoned. Reported in stdout and

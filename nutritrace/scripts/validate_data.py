@@ -287,9 +287,11 @@ def main():
       "with citations, and remaining items (non-vegetarian foods without a "
       "defensible proxy, most INDB recipes) stay `missing`. The app shows B12 "
       "RDA targets; unresolved `missing` entries will read as unmet.")
-    w(f"- **Sodium outliers:** the converter dropped sodium from {len(q_sodium)} "
-      f"INDB row(s) whose source value exceeded 8000 mg/100g (physically "
-      f"impossible). {len(na_out)} remaining recipes still report "
+    na_drop_n = len(q_sodium)
+    na_drop_word = "row" if na_drop_n == 1 else "rows"
+    w(f"- **Sodium outliers:** the converter dropped sodium from {na_drop_n} "
+      f"INDB {na_drop_word} whose source value exceeded 8000 mg/100g "
+      f"(physically impossible). {len(na_out)} remaining recipes still report "
       f">{int(SODIUM_REPORT_FLOOR)} mg/100g — high but within INDB's published "
       f"data; listed below for review.")
     w("- **Per-100g fallback:** {0} condiment-type recipes (jams/sauces/etc.) "
