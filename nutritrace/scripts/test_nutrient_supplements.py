@@ -604,6 +604,87 @@ except ValueError as e:
     assert_true(False, f"Supplement JSON validation failed: {e}")
 
 # -----------------------------------------------------------------------
+print("\n[Test 24] Validation rejects positive override missing source_ref")
+# -----------------------------------------------------------------------
+bad_data_no_src_ref = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "b12": {
+                "value": 2.0,
+                "status": "estimated",
+                # missing source_ref!
+                "citation": "Some valid citation",
+                "confidence": 0.7
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_data_no_src_ref)
+    assert_true(False, "Should have raised ValueError for missing source_ref")
+except ValueError as e:
+    assert_true("source_ref" in str(e).lower(),
+                f"ValueError mentions source_ref: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 25] Validation rejects negative value on override")
+# -----------------------------------------------------------------------
+bad_data_negative = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "b12": {
+                "value": -0.5,
+                "status": "estimated",
+                "source_ref": "test_src",
+                "citation": "Some citation",
+                "confidence": 0.7
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_data_negative)
+    assert_true(False, "Should have raised ValueError for negative value")
+except ValueError as e:
+    assert_true("non-negative" in str(e).lower() or "negative" in str(e).lower(),
+                f"ValueError mentions non-negative/negative: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 26] Validation rejects non-numeric value on override")
+# -----------------------------------------------------------------------
+bad_data_non_numeric = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "b12": {
+                "value": "not_a_number",
+                "status": "estimated",
+                "source_ref": "test_src",
+                "citation": "Some citation",
+                "confidence": 0.7
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_data_non_numeric)
+    assert_true(False, "Should have raised ValueError for non-numeric value")
+except ValueError as e:
+    assert_true("numeric" in str(e).lower(),
+                f"ValueError mentions numeric: {e}")
+
+# -----------------------------------------------------------------------
 # Summary
 # -----------------------------------------------------------------------
 print(f"\n{'='*60}")
