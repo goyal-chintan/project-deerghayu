@@ -43,7 +43,9 @@
       "description": "B12 is zero for unfortified plant foods from IFCT vegetarian groups (excluding dairy).",
       "match": {
         "data_source": "IFCT 2017",
-        "diet_type": ["vegetarian"],
+        "diet_type": [
+          "vegetarian"
+        ],
         "groups_include": [
           "Cereals and Millets",
           "Condiments and Spices",
@@ -59,7 +61,9 @@
           "Miscellaneous Foods"
         ]
       },
-      "exclude_items": ["T013"],
+      "exclude_items": [
+        "T013"
+      ],
       "notes": "Excludes Ghee (T013) which is animal-derived dairy fat but classified vegetarian in Indian system. Milk and Milk Products excluded from groups_include because dairy contains B12. Fermented foods (e.g. idli batter from Cereals/Legumes) still get zero — fermentation B12 analogues are not reliable active cobalamin."
     },
     {
@@ -71,7 +75,9 @@
       "description": "Cholesterol is zero for plant-only foods.",
       "match": {
         "data_source": "IFCT 2017",
-        "diet_type": ["vegetarian"],
+        "diet_type": [
+          "vegetarian"
+        ],
         "groups_include": [
           "Cereals and Millets",
           "Condiments and Spices",
@@ -97,9 +103,13 @@
       "description": "Cholesterol is zero for plant-derived oils (Edible Oils and Fats group excluding Ghee).",
       "match": {
         "data_source": "IFCT 2017",
-        "groups_include": ["Edible Oils and Fats"]
+        "groups_include": [
+          "Edible Oils and Fats"
+        ]
       },
-      "exclude_items": ["T013"],
+      "exclude_items": [
+        "T013"
+      ],
       "notes": "Ghee (T013) is excluded — it has ~256 mg/100g cholesterol. Vanaspati (T014) is hydrogenated vegetable oil, cholesterol = 0."
     },
     {
@@ -110,7 +120,10 @@
       "source_ref": "domain_caffeine",
       "description": "Caffeine is zero for all foods/recipes except tea, coffee, cocoa/chocolate items.",
       "match": {
-        "data_source": ["IFCT 2017", "INDB 2024.11"]
+        "data_source": [
+          "IFCT 2017",
+          "INDB 2024.11"
+        ]
       },
       "exclude_name_patterns": [
         "\\btea\\b",
@@ -132,7 +145,10 @@
       "source_ref": "domain_alcohol",
       "description": "Alcohol is zero for all seed foods/recipes unless name indicates alcoholic beverage.",
       "match": {
-        "data_source": ["IFCT 2017", "INDB 2024.11"]
+        "data_source": [
+          "IFCT 2017",
+          "INDB 2024.11"
+        ]
       },
       "exclude_name_patterns": [
         "\\btoddy\\b",
@@ -181,7 +197,9 @@
           "Animal Meat",
           "Egg and Egg Products"
         ],
-        "requires_sourced": ["sugars"]
+        "requires_sourced": [
+          "sugars"
+        ]
       },
       "exclude_name_patterns": [
         "\\bsweet\\b",
@@ -204,7 +222,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "USDA SR Legacy: Milk, whole, 3.25% milkfat = 0.45 µg/100g. Buffalo milk estimated slightly lower based on comparative dairy literature; conservative 0.44 µg/100g.",
-        "notes": "Buffalo milk B12 not directly in USDA; estimated from cow milk (0.45) with minor adjustment. Indian buffalo milk composition broadly similar to cow milk for B12."
+        "notes": "Buffalo milk B12 not directly in USDA; estimated from cow milk (0.45) with minor adjustment. Indian buffalo milk composition broadly similar to cow milk for B12.",
+        "basis": "per_100g"
       }
     },
     "ifct:L002": {
@@ -213,7 +232,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.9,
-        "citation": "USDA SR Legacy NDB#01077: Milk, whole, 3.25% milkfat, with added vitamin D — Vitamin B-12: 0.45 µg/100g."
+        "citation": "USDA SR Legacy NDB#01077: Milk, whole, 3.25% milkfat, with added vitamin D — Vitamin B-12: 0.45 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:L003": {
@@ -223,7 +243,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.6,
         "citation": "Paneer is fresh unripened cheese from whole milk. USDA SR Legacy: Cheese, cottage, creamed = 0.63 µg/100g; Cheese, ricotta, whole milk = 0.34 µg/100g. Paneer is more concentrated than cottage cheese. Conservative estimate 0.8 µg/100g.",
-        "notes": "No direct USDA entry for Indian paneer. Value estimated from comparable fresh cheeses with concentration factor."
+        "notes": "No direct USDA entry for Indian paneer. Value estimated from comparable fresh cheeses with concentration factor.",
+        "basis": "per_100g"
       }
     },
     "ifct:L004": {
@@ -233,7 +254,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.5,
         "citation": "Khoa is milk reduced to ~25-30% of original volume (3-4x concentration). Cow milk B12 = 0.45 µg/100g × ~2.5 concentration factor (accounting for some heat degradation) ≈ 1.1 µg/100g.",
-        "notes": "No direct reference for khoa B12. Estimated from milk concentration with conservative heat-loss adjustment. Confidence low due to variability in preparation."
+        "notes": "No direct reference for khoa B12. Estimated from milk concentration with conservative heat-loss adjustment. Confidence low due to variability in preparation.",
+        "basis": "per_100g"
       }
     },
     "ifct:M001": {
@@ -242,7 +264,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.9,
-        "citation": "USDA SR Legacy NDB#01123: Egg, whole, raw, fresh — Vitamin B-12: 0.89 µg/100g."
+        "citation": "USDA SR Legacy NDB#01123: Egg, whole, raw, fresh — Vitamin B-12: 0.89 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:M002": {
@@ -251,7 +274,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.85,
-        "citation": "USDA SR Legacy NDB#01124: Egg, white, raw, fresh — Vitamin B-12: 0.09 µg/100g."
+        "citation": "USDA SR Legacy NDB#01124: Egg, white, raw, fresh — Vitamin B-12: 0.09 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:M003": {
@@ -260,7 +284,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.9,
-        "citation": "USDA SR Legacy NDB#01125: Egg, yolk, raw, fresh — Vitamin B-12: 1.95 µg/100g."
+        "citation": "USDA SR Legacy NDB#01125: Egg, yolk, raw, fresh — Vitamin B-12: 1.95 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:M004": {
@@ -269,7 +294,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.85,
-        "citation": "USDA SR Legacy NDB#01129: Egg, whole, cooked, hard-boiled — Vitamin B-12: 1.11 µg/100g."
+        "citation": "USDA SR Legacy NDB#01129: Egg, whole, cooked, hard-boiled — Vitamin B-12: 1.11 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:M005": {
@@ -279,7 +305,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.8,
         "citation": "USDA SR Legacy: Egg white raw = 0.09 µg/100g. Boiling does not significantly alter B12 in egg white. Estimated same as raw.",
-        "notes": "No separate USDA entry for boiled egg white; assumed equivalent to raw."
+        "notes": "No separate USDA entry for boiled egg white; assumed equivalent to raw.",
+        "basis": "per_100g"
       }
     },
     "ifct:M006": {
@@ -289,7 +316,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.8,
         "citation": "USDA SR Legacy: Egg yolk raw = 1.95 µg/100g. Hard-boiled whole egg shows slight concentration; yolk B12 estimated same as raw.",
-        "notes": "No separate USDA entry for boiled egg yolk alone."
+        "notes": "No separate USDA entry for boiled egg yolk alone.",
+        "basis": "per_100g"
       }
     },
     "ifct:M007": {
@@ -299,7 +327,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "USDA SR Legacy NDB#01132: Egg, whole, cooked, omelet — Vitamin B-12: 0.76 µg/100g.",
-        "notes": "Omelet diluted by cooking fat; slightly lower than raw whole egg."
+        "notes": "Omelet diluted by cooking fat; slightly lower than raw whole egg.",
+        "basis": "per_100g"
       }
     },
     "ifct:M008": {
@@ -309,7 +338,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
         "citation": "Country hen egg assumed similar to commercial poultry egg for B12 content. USDA SR Legacy: Egg, whole, raw = 0.89 µg/100g.",
-        "notes": "No separate B12 data for Indian country hen eggs; assumed equivalent to standard poultry eggs."
+        "notes": "No separate B12 data for Indian country hen eggs; assumed equivalent to standard poultry eggs.",
+        "basis": "per_100g"
       }
     },
     "ifct:M009": {
@@ -319,7 +349,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "Country hen egg boiled assumed similar to USDA hard-boiled egg (1.11 µg/100g).",
-        "notes": "No separate data for country hen boiled eggs."
+        "notes": "No separate data for country hen boiled eggs.",
+        "basis": "per_100g"
       }
     },
     "ifct:M010": {
@@ -329,7 +360,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "Country hen omelet assumed similar to USDA omelet (0.76 µg/100g).",
-        "notes": "No separate data for country hen omelet."
+        "notes": "No separate data for country hen omelet.",
+        "basis": "per_100g"
       }
     },
     "ifct:M011": {
@@ -339,7 +371,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.85,
         "citation": "USDA SR Legacy NDB#01138: Egg, duck, whole, fresh, raw — Vitamin B-12: 5.40 µg/100g. Boiled value assumed similar.",
-        "notes": "Duck eggs are notably higher in B12 than chicken eggs."
+        "notes": "Duck eggs are notably higher in B12 than chicken eggs.",
+        "basis": "per_100g"
       }
     },
     "ifct:M012": {
@@ -348,7 +381,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.85,
-        "citation": "USDA SR Legacy NDB#01138: Egg, duck, whole, fresh, raw — Vitamin B-12: 5.40 µg/100g."
+        "citation": "USDA SR Legacy NDB#01138: Egg, duck, whole, fresh, raw — Vitamin B-12: 5.40 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:M013": {
@@ -358,7 +392,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "Duck egg omelet estimated from raw duck egg (5.4 µg/100g) with ~15-20% dilution from cooking fat, similar to chicken omelet reduction pattern.",
-        "notes": "No direct USDA entry for duck egg omelet."
+        "notes": "No direct USDA entry for duck egg omelet.",
+        "basis": "per_100g"
       }
     },
     "ifct:M014": {
@@ -367,7 +402,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.85,
-        "citation": "USDA SR Legacy NDB#01140: Egg, quail, whole, fresh, raw — Vitamin B-12: 1.58 µg/100g."
+        "citation": "USDA SR Legacy NDB#01140: Egg, quail, whole, fresh, raw — Vitamin B-12: 1.58 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:M015": {
@@ -377,7 +413,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.8,
         "citation": "Quail egg boiled assumed same as raw (1.58 µg/100g); boiling does not significantly degrade B12.",
-        "notes": "No separate USDA entry for boiled quail egg."
+        "notes": "No separate USDA entry for boiled quail egg.",
+        "basis": "per_100g"
       }
     },
     "ifct:O001": {
@@ -386,7 +423,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.8,
-        "citation": "USDA SR Legacy NDB#17168: Game meat, goat, raw — Vitamin B-12: 1.13 µg/100g."
+        "citation": "USDA SR Legacy NDB#17168: Game meat, goat, raw — Vitamin B-12: 1.13 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:O002": {
@@ -396,7 +434,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
         "citation": "Goat chops (muscle meat) estimated same as goat shoulder. USDA SR Legacy NDB#17168: Game meat, goat, raw — 1.13 µg/100g.",
-        "notes": "B12 distribution across goat muscle cuts is relatively uniform."
+        "notes": "B12 distribution across goat muscle cuts is relatively uniform.",
+        "basis": "per_100g"
       }
     },
     "ifct:O003": {
@@ -405,7 +444,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
-        "citation": "Goat legs (muscle meat) estimated same as goat raw. USDA SR Legacy NDB#17168: Game meat, goat, raw — 1.13 µg/100g."
+        "citation": "Goat legs (muscle meat) estimated same as goat raw. USDA SR Legacy NDB#17168: Game meat, goat, raw — 1.13 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:O004": {
@@ -415,7 +455,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.6,
         "citation": "Goat brain estimated from beef brain proxy. USDA SR Legacy NDB#13320: Beef, brain, raw — Vitamin B-12: ~9.0 µg/100g.",
-        "notes": "No direct USDA entry for goat brain; ruminant brain tissue assumed similar across species."
+        "notes": "No direct USDA entry for goat brain; ruminant brain tissue assumed similar across species.",
+        "basis": "per_100g"
       }
     },
     "ifct:O007": {
@@ -425,7 +466,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.6,
         "citation": "Goat heart estimated from beef heart proxy. USDA SR Legacy NDB#13321: Beef, heart, raw — Vitamin B-12: 8.55 µg/100g.",
-        "notes": "No direct USDA entry for goat heart; ruminant heart tissue assumed similar."
+        "notes": "No direct USDA entry for goat heart; ruminant heart tissue assumed similar.",
+        "basis": "per_100g"
       }
     },
     "ifct:O008": {
@@ -435,7 +477,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "Goat liver estimated from ruminant liver range. USDA SR Legacy: Beef liver raw = 59.3 µg/100g (NDB#13325); Lamb liver raw ≈ 90 µg/100g (NDB#17168). Goat liver conservatively estimated at 60 µg/100g.",
-        "notes": "Goat and sheep are physiologically similar; goat liver B12 likely in 50-90 µg/100g range. Conservative estimate used."
+        "notes": "Goat and sheep are physiologically similar; goat liver B12 likely in 50-90 µg/100g range. Conservative estimate used.",
+        "basis": "per_100g"
       }
     },
     "ifct:O011": {
@@ -445,7 +488,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.6,
         "citation": "Goat kidneys estimated from ruminant kidney range. USDA SR Legacy: Beef kidneys raw = 27.5 µg/100g (NDB#13326); Lamb kidneys raw ≈ 52 µg/100g. Conservative estimate 28 µg/100g.",
-        "notes": "No direct USDA entry for goat kidneys."
+        "notes": "No direct USDA entry for goat kidneys.",
+        "basis": "per_100g"
       }
     },
     "ifct:O014": {
@@ -455,7 +499,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "Sheep shoulder muscle meat. USDA SR Legacy NDB#17009: Lamb, shoulder, raw — Vitamin B-12: ~2.3 µg/100g.",
-        "notes": "Lamb/sheep muscle meat typically 2-3 µg/100g."
+        "notes": "Lamb/sheep muscle meat typically 2-3 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:O015": {
@@ -464,7 +509,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
-        "citation": "Sheep chops estimated same as sheep shoulder. USDA SR Legacy: Lamb raw muscle ≈ 2.3 µg/100g."
+        "citation": "Sheep chops estimated same as sheep shoulder. USDA SR Legacy: Lamb raw muscle ≈ 2.3 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:O016": {
@@ -473,7 +519,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
-        "citation": "USDA SR Legacy NDB#17013: Lamb, leg, whole, raw — Vitamin B-12: ~2.6 µg/100g."
+        "citation": "USDA SR Legacy NDB#17013: Lamb, leg, whole, raw — Vitamin B-12: ~2.6 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:O021": {
@@ -483,7 +530,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "USDA SR Legacy NDB#17168 (lamb variety meats): Lamb, liver, raw — Vitamin B-12: ~86-90 µg/100g. Conservative estimate 86 µg/100g.",
-        "notes": "Lamb/sheep liver is among the highest B12 food sources."
+        "notes": "Lamb/sheep liver is among the highest B12 food sources.",
+        "basis": "per_100g"
       }
     },
     "ifct:O024": {
@@ -493,7 +541,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.65,
         "citation": "USDA SR Legacy: Lamb, kidneys, raw — Vitamin B-12: ~52 µg/100g.",
-        "notes": "Lamb kidneys are very high in B12."
+        "notes": "Lamb kidneys are very high in B12.",
+        "basis": "per_100g"
       }
     },
     "ifct:O025": {
@@ -503,7 +552,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "USDA SR Legacy: Beef, chuck/shoulder, raw — Vitamin B-12: ~2.6 µg/100g.",
-        "notes": "Shoulder cuts slightly higher B12 than lean round."
+        "notes": "Shoulder cuts slightly higher B12 than lean round.",
+        "basis": "per_100g"
       }
     },
     "ifct:O026": {
@@ -513,7 +563,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "USDA SR Legacy: Beef, chuck/round cuts, raw — Vitamin B-12 range: 2.0-3.0 µg/100g. Conservative estimate 2.5 µg/100g for beef chops.",
-        "notes": "Muscle meat B12 varies by cut; 2.5 is a conservative mid-range estimate."
+        "notes": "Muscle meat B12 varies by cut; 2.5 is a conservative mid-range estimate.",
+        "basis": "per_100g"
       }
     },
     "ifct:O027": {
@@ -523,7 +574,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "USDA SR Legacy: Beef, round (leg), raw — Vitamin B-12: ~2.4 µg/100g.",
-        "notes": "Lean beef cuts typically 2-3 µg/100g."
+        "notes": "Lean beef cuts typically 2-3 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:O028": {
@@ -533,7 +585,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "USDA SR Legacy NDB#13320: Beef, variety meats and by-products, brain, raw — Vitamin B-12: 9.0 µg/100g (approximate).",
-        "notes": "Brain tissue is moderately rich in B12."
+        "notes": "Brain tissue is moderately rich in B12.",
+        "basis": "per_100g"
       }
     },
     "ifct:O031": {
@@ -542,7 +595,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.8,
-        "citation": "USDA SR Legacy NDB#13321: Beef, variety meats and by-products, heart, raw — Vitamin B-12: 8.55 µg/100g."
+        "citation": "USDA SR Legacy NDB#13321: Beef, variety meats and by-products, heart, raw — Vitamin B-12: 8.55 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:O032": {
@@ -552,7 +606,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.85,
         "citation": "USDA SR Legacy NDB#13325: Beef, variety meats and by-products, liver, raw — Vitamin B-12: 59.3 µg/100g.",
-        "notes": "Liver is the richest natural source of B12."
+        "notes": "Liver is the richest natural source of B12.",
+        "basis": "per_100g"
       }
     },
     "ifct:O035": {
@@ -561,7 +616,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.8,
-        "citation": "USDA SR Legacy NDB#13326: Beef, variety meats and by-products, kidneys, raw — Vitamin B-12: 27.5 µg/100g."
+        "citation": "USDA SR Legacy NDB#13326: Beef, variety meats and by-products, kidneys, raw — Vitamin B-12: 27.5 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:O042": {
@@ -571,7 +627,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "Calf (veal) liver B12 assumed similar to beef liver (59.3 µg/100g). USDA SR Legacy NDB#17190: Veal, variety meats, liver, raw — Vitamin B-12: 60+ µg/100g range.",
-        "notes": "Calf liver may be slightly higher than adult beef liver; conservative estimate used."
+        "notes": "Calf liver may be slightly higher than adult beef liver; conservative estimate used.",
+        "basis": "per_100g"
       }
     },
     "ifct:O044": {
@@ -581,7 +638,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.65,
         "citation": "Calf kidneys B12 assumed similar to beef kidneys (27.5 µg/100g).",
-        "notes": "No separate USDA entry for veal kidneys specifically."
+        "notes": "No separate USDA entry for veal kidneys specifically.",
+        "basis": "per_100g"
       }
     },
     "ifct:O048": {
@@ -591,7 +649,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
         "citation": "USDA SR Legacy NDB#10005: Pork, shoulder, raw — Vitamin B-12: ~0.7 µg/100g.",
-        "notes": "Pork muscle meat has lower B12 than ruminant meat."
+        "notes": "Pork muscle meat has lower B12 than ruminant meat.",
+        "basis": "per_100g"
       }
     },
     "ifct:O049": {
@@ -600,7 +659,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
-        "citation": "USDA SR Legacy: Pork, loin chops, raw — Vitamin B-12: ~0.5-0.7 µg/100g. Conservative estimate 0.6 µg/100g."
+        "citation": "USDA SR Legacy: Pork, loin chops, raw — Vitamin B-12: ~0.5-0.7 µg/100g. Conservative estimate 0.6 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:O053": {
@@ -609,7 +669,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.8,
-        "citation": "USDA SR Legacy NDB#10136: Pork, variety meats and by-products, liver, raw — Vitamin B-12: 26.0 µg/100g."
+        "citation": "USDA SR Legacy NDB#10136: Pork, variety meats and by-products, liver, raw — Vitamin B-12: 26.0 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:O056": {
@@ -619,7 +680,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.65,
         "citation": "USDA SR Legacy: Pork, kidneys, raw — Vitamin B-12: ~15 µg/100g (approximate from SR data).",
-        "notes": "Pork kidneys have less B12 than ruminant kidneys."
+        "notes": "Pork kidneys have less B12 than ruminant kidneys.",
+        "basis": "per_100g"
       }
     },
     "ifct:N001": {
@@ -628,7 +690,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
-        "citation": "USDA SR Legacy NDB#05091: Chicken, broilers or fryers, leg, meat only, raw — Vitamin B-12: 0.31 µg/100g."
+        "citation": "USDA SR Legacy NDB#05091: Chicken, broilers or fryers, leg, meat only, raw — Vitamin B-12: 0.31 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:N002": {
@@ -637,7 +700,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
-        "citation": "USDA SR Legacy NDB#05096: Chicken, broilers or fryers, thigh, meat only, raw — Vitamin B-12: 0.31 µg/100g."
+        "citation": "USDA SR Legacy NDB#05096: Chicken, broilers or fryers, thigh, meat only, raw — Vitamin B-12: 0.31 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:N003": {
@@ -646,7 +710,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.8,
-        "citation": "USDA SR Legacy NDB#05062: Chicken, broilers or fryers, breast, skinless, boneless, meat only, raw — Vitamin B-12: 0.34 µg/100g."
+        "citation": "USDA SR Legacy NDB#05062: Chicken, broilers or fryers, breast, skinless, boneless, meat only, raw — Vitamin B-12: 0.34 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:N004": {
@@ -656,7 +721,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "USDA SR Legacy: Chicken wing, meat only, raw — Vitamin B-12: ~0.28 µg/100g.",
-        "notes": "Wing meat slightly lower B12 than breast/thigh."
+        "notes": "Wing meat slightly lower B12 than breast/thigh.",
+        "basis": "per_100g"
       }
     },
     "ifct:N005": {
@@ -666,7 +732,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.85,
         "citation": "USDA SR Legacy NDB#05027: Chicken, liver, all classes, raw — Vitamin B-12: 16.58 µg/100g.",
-        "notes": "Chicken liver is a rich B12 source, though less concentrated than ruminant livers."
+        "notes": "Chicken liver is a rich B12 source, though less concentrated than ruminant livers.",
+        "basis": "per_100g"
       }
     },
     "ifct:N006": {
@@ -675,7 +742,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
-        "citation": "USDA SR Legacy NDB#05028: Chicken, gizzard, all classes, raw — Vitamin B-12: 1.21 µg/100g."
+        "citation": "USDA SR Legacy NDB#05028: Chicken, gizzard, all classes, raw — Vitamin B-12: 1.21 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:N011": {
@@ -685,7 +753,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.65,
         "citation": "USDA SR Legacy NDB#05140: Duck, domesticated, meat only, raw — Vitamin B-12: 3.0 µg/100g (approximate).",
-        "notes": "Duck meat has notably more B12 than chicken."
+        "notes": "Duck meat has notably more B12 than chicken.",
+        "basis": "per_100g"
       }
     },
     "ifct:N016": {
@@ -694,7 +763,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
-        "citation": "USDA SR Legacy NDB#05165: Turkey, all classes, leg, meat only, raw — Vitamin B-12: ~1.0 µg/100g."
+        "citation": "USDA SR Legacy NDB#05165: Turkey, all classes, leg, meat only, raw — Vitamin B-12: ~1.0 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:P003": {
@@ -704,7 +774,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
         "citation": "USDA SR Legacy NDB#15001: Fish, anchovy, European, raw — Vitamin B-12: 3.19 µg/100g.",
-        "notes": "Indian anchovy species may differ slightly but order of magnitude is similar."
+        "notes": "Indian anchovy species may differ slightly but order of magnitude is similar.",
+        "basis": "per_100g"
       }
     },
     "ifct:P020": {
@@ -714,7 +785,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
         "citation": "USDA SR Legacy NDB#15046: Fish, mackerel, Atlantic, raw — Vitamin B-12: 8.71 µg/100g.",
-        "notes": "Indian mackerel (Rastrelliger kanagurta) may differ; Atlantic mackerel used as proxy."
+        "notes": "Indian mackerel (Rastrelliger kanagurta) may differ; Atlantic mackerel used as proxy.",
+        "basis": "per_100g"
       }
     },
     "ifct:P043": {
@@ -724,7 +796,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "USDA SR Legacy NDB#15088: Fish, sardine, Atlantic, canned in oil, drained — Vitamin B-12: 8.94 µg/100g. Fresh sardine likely similar range.",
-        "notes": "Sardines are consistently high in B12 across species. Indian sardine (Sardinella longiceps) expected in similar range."
+        "notes": "Sardines are consistently high in B12 across species. Indian sardine (Sardinella longiceps) expected in similar range.",
+        "basis": "per_100g"
       }
     },
     "ifct:S002": {
@@ -734,7 +807,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.6,
         "citation": "Catla (Catla catla) is an Indian major carp. Estimated from USDA freshwater carp B12 range (~1.5-3.0 µg/100g). Conservative estimate 2.0 µg/100g.",
-        "notes": "No direct USDA entry for catla."
+        "notes": "No direct USDA entry for catla.",
+        "basis": "per_100g"
       }
     },
     "ifct:S006": {
@@ -744,7 +818,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.6,
         "citation": "USDA SR Legacy: Fish, carp (similar freshwater species), raw — Vitamin B-12: ~1.5-3.0 µg/100g. Rohu (Labeo rohita) estimated at 2.0 µg/100g as conservative mid-range.",
-        "notes": "No direct USDA entry for rohu; carp family used as proxy."
+        "notes": "No direct USDA entry for rohu; carp family used as proxy.",
+        "basis": "per_100g"
       }
     },
     "ifct:S008": {
@@ -753,7 +828,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
-        "citation": "USDA SR Legacy NDB#15152: Crustaceans, shrimp, mixed species, raw — Vitamin B-12: 1.11 µg/100g."
+        "citation": "USDA SR Legacy NDB#15152: Crustaceans, shrimp, mixed species, raw — Vitamin B-12: 1.11 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:S009": {
@@ -763,7 +839,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "Small prawns assumed similar B12 to mixed shrimp species (1.1 µg/100g).",
-        "notes": "Size variation unlikely to significantly affect B12 per 100g."
+        "notes": "Size variation unlikely to significantly affect B12 per 100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:S010": {
@@ -772,7 +849,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
-        "citation": "Tiger prawns assumed similar to mixed shrimp species (1.1 µg/100g)."
+        "citation": "Tiger prawns assumed similar to mixed shrimp species (1.1 µg/100g).",
+        "basis": "per_100g"
       }
     },
     "ifct:Q001": {
@@ -782,7 +860,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
         "citation": "USDA SR Legacy NDB#15136: Crustaceans, crab, blue, raw — Vitamin B-12: 11.5 µg/100g.",
-        "notes": "Indian crab species may differ; blue crab used as proxy. Crabs are consistently high in B12."
+        "notes": "Indian crab species may differ; blue crab used as proxy. Crabs are consistently high in B12.",
+        "basis": "per_100g"
       }
     },
     "ifct:Q002": {
@@ -792,7 +871,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "Sea crab estimated same as blue crab. USDA SR Legacy NDB#15136: Crustaceans, crab, blue, raw — 11.5 µg/100g.",
-        "notes": "Crab B12 is consistently high across species."
+        "notes": "Crab B12 is consistently high across species.",
+        "basis": "per_100g"
       }
     },
     "ifct:Q003": {
@@ -801,7 +881,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
-        "citation": "USDA SR Legacy NDB#15147: Crustaceans, lobster, northern, raw — Vitamin B-12: 1.43 µg/100g."
+        "citation": "USDA SR Legacy NDB#15147: Crustaceans, lobster, northern, raw — Vitamin B-12: 1.43 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:Q004": {
@@ -810,7 +891,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
-        "citation": "King size lobster assumed similar B12 to northern lobster (1.43 µg/100g). USDA SR Legacy NDB#15147."
+        "citation": "King size lobster assumed similar B12 to northern lobster (1.43 µg/100g). USDA SR Legacy NDB#15147.",
+        "basis": "per_100g"
       }
     },
     "ifct:Q005": {
@@ -820,7 +902,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.65,
         "citation": "Mud crab estimated from blue crab proxy (11.5 µg/100g). USDA SR Legacy NDB#15136.",
-        "notes": "Mud crab (Scylla spp.) assumed similar to other crab species for B12."
+        "notes": "Mud crab (Scylla spp.) assumed similar to other crab species for B12.",
+        "basis": "per_100g"
       }
     },
     "ifct:Q006": {
@@ -830,7 +913,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.8,
         "citation": "USDA SR Legacy NDB#15167: Mollusks, oyster, eastern, raw — Vitamin B-12: 16.0 µg/100g.",
-        "notes": "Oysters are among the richest B12 shellfish."
+        "notes": "Oysters are among the richest B12 shellfish.",
+        "basis": "per_100g"
       }
     },
     "ifct:Q007": {
@@ -839,7 +923,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
-        "citation": "Tiger prawns (brown) assumed similar to mixed shrimp species (1.1 µg/100g). USDA SR Legacy NDB#15152."
+        "citation": "Tiger prawns (brown) assumed similar to mixed shrimp species (1.1 µg/100g). USDA SR Legacy NDB#15152.",
+        "basis": "per_100g"
       }
     },
     "ifct:Q008": {
@@ -848,7 +933,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
-        "citation": "Tiger prawns (orange) assumed similar to mixed shrimp species (1.1 µg/100g). USDA SR Legacy NDB#15152."
+        "citation": "Tiger prawns (orange) assumed similar to mixed shrimp species (1.1 µg/100g). USDA SR Legacy NDB#15152.",
+        "basis": "per_100g"
       }
     },
     "ifct:R001": {
@@ -858,7 +944,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.75,
         "citation": "USDA SR Legacy NDB#15157: Mollusks, clam, mixed species, raw — Vitamin B-12: 98.89 µg/100g.",
-        "notes": "Clams are the highest known natural food source of B12. Indian green shell clam assumed in similar range."
+        "notes": "Clams are the highest known natural food source of B12. Indian green shell clam assumed in similar range.",
+        "basis": "per_100g"
       }
     },
     "ifct:R002": {
@@ -868,7 +955,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "White shell clam estimated from mixed clam species (98.9 µg/100g). USDA SR Legacy NDB#15157.",
-        "notes": "Clam B12 is consistently very high across species."
+        "notes": "Clam B12 is consistently very high across species.",
+        "basis": "per_100g"
       }
     },
     "ifct:R003": {
@@ -878,7 +966,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "USDA SR Legacy NDB#15166: Mollusks, octopus, common, raw — Vitamin B-12: 20.0 µg/100g.",
-        "notes": "Octopus and mollusks are exceptionally high in B12."
+        "notes": "Octopus and mollusks are exceptionally high in B12.",
+        "basis": "per_100g"
       }
     },
     "ifct:R004": {
@@ -887,7 +976,8 @@
         "status": "sourced",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
-        "citation": "USDA SR Legacy NDB#15175: Mollusks, squid, mixed species, raw — Vitamin B-12: 1.30 µg/100g."
+        "citation": "USDA SR Legacy NDB#15175: Mollusks, squid, mixed species, raw — Vitamin B-12: 1.30 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "ifct:R005": {
@@ -896,7 +986,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.65,
-        "citation": "Hard shell squid assumed similar B12 to mixed squid species (1.3 µg/100g)."
+        "citation": "Hard shell squid assumed similar B12 to mixed squid species (1.3 µg/100g).",
+        "basis": "per_100g"
       }
     },
     "ifct:R006": {
@@ -905,7 +996,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.65,
-        "citation": "Red squid assumed similar B12 to mixed squid species (1.3 µg/100g). USDA SR Legacy NDB#15175."
+        "citation": "Red squid assumed similar B12 to mixed squid species (1.3 µg/100g). USDA SR Legacy NDB#15175.",
+        "basis": "per_100g"
       }
     },
     "ifct:R007": {
@@ -914,7 +1006,8 @@
         "status": "estimated",
         "source_ref": "usda_sr_legacy",
         "confidence": 0.65,
-        "citation": "Small white squid assumed similar B12 to mixed squid species (1.3 µg/100g). USDA SR Legacy NDB#15175."
+        "citation": "Small white squid assumed similar B12 to mixed squid species (1.3 µg/100g). USDA SR Legacy NDB#15175.",
+        "basis": "per_100g"
       }
     },
     "ifct:T013": {
@@ -924,7 +1017,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.6,
         "citation": "Ghee is clarified butter. USDA SR Legacy NDB#01001: Butter, salted — Vitamin B-12: 0.17 µg/100g. Ghee is more concentrated (water removed) but B12 may partially degrade during clarification. Conservative estimate 0.6 µg/100g based on concentration factor ~3x with degradation.",
-        "notes": "Ghee B12 data is sparse. Value is conservative estimate; confidence low."
+        "notes": "Ghee B12 data is sparse. Value is conservative estimate; confidence low.",
+        "basis": "per_100g"
       }
     }
   },
@@ -937,7 +1031,8 @@
         "source_ref": "domain_b12_plant",
         "confidence": 0.9,
         "citation": "Hot tea (Garam Chai) — tea infusion has zero B12. Even with milk addition, B12 contribution per serving is negligible at beverage dilution.",
-        "notes": "Tea with milk might have trace B12 from milk but at typical dilution (10-20ml milk in 150ml tea) it rounds to 0 per 100g of prepared beverage."
+        "notes": "Tea with milk might have trace B12 from milk but at typical dilution (10-20ml milk in 150ml tea) it rounds to 0 per 100g of prepared beverage.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC002": {
@@ -946,7 +1041,8 @@
         "status": "explicit_zero",
         "source_ref": "domain_b12_plant",
         "confidence": 0.95,
-        "citation": "Instant coffee — coffee infusion has zero B12. Black coffee or coffee with minor milk addition contributes negligible B12 per 100g beverage."
+        "citation": "Instant coffee — coffee infusion has zero B12. Black coffee or coffee with minor milk addition contributes negligible B12 per 100g beverage.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC003": {
@@ -955,7 +1051,8 @@
         "status": "explicit_zero",
         "source_ref": "domain_b12_plant",
         "confidence": 0.95,
-        "citation": "Espresso coffee — zero B12. Coffee beans contain no cobalamin."
+        "citation": "Espresso coffee — zero B12. Coffee beans contain no cobalamin.",
+        "basis": "per_100g"
       }
     },
     "indb:OSR062": {
@@ -965,7 +1062,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Afghani chicken — chicken curry dish. Chicken muscle ~0.3 µg/100g raw; assuming ~40% meat by weight in prepared dish with dilution from cream/spices/oil. USDA FNDDS: Chicken curry ≈ 0.1-0.3 µg B12/100g prepared. Conservative estimate 0.15 µg/100g.",
-        "notes": "No exact FNDDS match for Afghani chicken; estimated from generic chicken curry proxies."
+        "notes": "No exact FNDDS match for Afghani chicken; estimated from generic chicken curry proxies.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC060": {
@@ -975,7 +1073,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.6,
         "citation": "Baked egg — primarily whole egg baked. USDA SR: Egg, whole, cooked ≈ 0.89-1.11 µg/100g. Baked egg with minor additions (butter/seasoning) estimated at 0.8 µg/100g.",
-        "notes": "High egg proportion expected in baked egg preparation."
+        "notes": "High egg proportion expected in baked egg preparation.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC250": {
@@ -985,7 +1084,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Baked fish with cheese sauce — fish (~1-9 µg/100g raw) plus cheese (~1.3 µg/100g). Assuming ~30-40% fish, ~15% cheese sauce in prepared weight. USDA FNDDS: Fish with sauce ≈ 0.5-1.5 µg B12/100g. Conservative estimate 0.7 µg/100g.",
-        "notes": "Wide range possible depending on fish species used."
+        "notes": "Wide range possible depending on fish species used.",
+        "basis": "per_100g"
       }
     },
     "indb:BFP231": {
@@ -995,7 +1095,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Baked stuffed fish — fish as primary ingredient. Assuming ~35% fish by prepared weight with stuffing dilution. Conservative estimate 0.6 µg/100g.",
-        "notes": "Fish species unknown; mid-range estimate used."
+        "notes": "Fish species unknown; mid-range estimate used.",
+        "basis": "per_100g"
       }
     },
     "indb:BFP240": {
@@ -1005,7 +1106,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.55,
         "citation": "Egg curry (Anda curry) — boiled eggs in curry sauce. USDA: Boiled egg = 1.11 µg/100g; assuming ~40% egg by prepared weight in gravy. Estimated 0.5 µg/100g.",
-        "notes": "Typical egg curry has 1-2 boiled eggs in tomato/onion gravy per serving."
+        "notes": "Typical egg curry has 1-2 boiled eggs in tomato/onion gravy per serving.",
+        "basis": "per_100g"
       }
     },
     "indb:OSR069": {
@@ -1015,7 +1117,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Baked eggs in tomato sauce — eggs in tomato sauce (shakshuka-style). Assuming ~35-45% egg by weight. Estimated 0.5 µg/100g.",
-        "notes": "Similar preparation to egg curry in terms of egg proportion."
+        "notes": "Similar preparation to egg curry in terms of egg proportion.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC056": {
@@ -1025,7 +1128,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.7,
         "citation": "Boiled egg (Ubla anda) — hard-boiled egg. USDA SR Legacy: Egg, hard-boiled = 1.11 µg/100g. Slightly conservative 1.0 µg/100g accounting for possible partial yolk removal or serving variation.",
-        "notes": "This is essentially a plain boiled egg; high confidence in B12 content."
+        "notes": "This is essentially a plain boiled egg; high confidence in B12 content.",
+        "basis": "per_100g"
       }
     },
     "indb:BFP054": {
@@ -1035,7 +1139,8 @@
         "source_ref": "usda_sr_legacy",
         "confidence": 0.65,
         "citation": "French omelette/omlet — USDA SR Legacy NDB#01132: Egg omelet = 0.76 µg/100g.",
-        "notes": "Plain omelet with minimal additions."
+        "notes": "Plain omelet with minimal additions.",
+        "basis": "per_100g"
       }
     },
     "indb:OSR072": {
@@ -1044,7 +1149,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.55,
-        "citation": "Corn omelette/omlet — egg omelet with corn addition. Omelet base ~0.76 µg/100g diluted by corn filling (~30%). Estimated 0.5 µg/100g."
+        "citation": "Corn omelette/omlet — egg omelet with corn addition. Omelet base ~0.76 µg/100g diluted by corn filling (~30%). Estimated 0.5 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:BFP057": {
@@ -1053,7 +1159,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.55,
-        "citation": "Cheese and mushroom omelette/omlet — egg omelet (0.76 µg/100g) with cheese (~1.3 µg/100g). Combined with mushroom dilution. Estimated 0.6 µg/100g."
+        "citation": "Cheese and mushroom omelette/omlet — egg omelet (0.76 µg/100g) with cheese (~1.3 µg/100g). Combined with mushroom dilution. Estimated 0.6 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC240": {
@@ -1063,7 +1170,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Chicken curry — USDA FNDDS: Chicken curry, Indian style ≈ 0.1-0.2 µg B12/100g prepared. Chicken raw ~0.3 µg/100g; ~35-45% meat in curry. Conservative estimate 0.15 µg/100g.",
-        "notes": "Chicken is low in B12 relative to other meats; curry has significant gravy dilution."
+        "notes": "Chicken is low in B12 relative to other meats; curry has significant gravy dilution.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC242": {
@@ -1073,7 +1181,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Butter chicken — similar to chicken curry with cream/butter sauce. Estimated 0.15 µg/100g.",
-        "notes": "Rich sauce dilutes meat proportion; B12 primarily from chicken."
+        "notes": "Rich sauce dilutes meat proportion; B12 primarily from chicken.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC244": {
@@ -1082,7 +1191,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.5,
-        "citation": "Chilli chicken — stir-fried chicken dish. Similar meat proportion to chicken curry. Estimated 0.15 µg/100g."
+        "citation": "Chilli chicken — stir-fried chicken dish. Similar meat proportion to chicken curry. Estimated 0.15 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC135": {
@@ -1091,7 +1201,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.45,
-        "citation": "Chicken chowmein — noodle dish with chicken. Significant noodle/vegetable bulk dilutes meat. Estimated 0.12 µg/100g."
+        "citation": "Chicken chowmein — noodle dish with chicken. Significant noodle/vegetable bulk dilutes meat. Estimated 0.12 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC122": {
@@ -1101,7 +1212,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Mutton biryani/biriyani — rice dish with goat/lamb meat. Mutton raw ~1.1-2.3 µg/100g; ~25-35% meat in biryani. USDA FNDDS: Lamb pilaf ≈ 0.3-0.6 µg/100g. Conservative estimate 0.4 µg/100g.",
-        "notes": "Biryani has substantial rice component diluting per-100g B12."
+        "notes": "Biryani has substantial rice component diluting per-100g B12.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC234": {
@@ -1111,7 +1223,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Mutton do piaza — goat/lamb curry with onions. Meat raw ~1.1-2.3 µg/100g; ~40-50% meat in curry. Estimated 0.5 µg/100g.",
-        "notes": "Do piaza has higher meat:gravy ratio than typical curries."
+        "notes": "Do piaza has higher meat:gravy ratio than typical curries.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC236": {
@@ -1120,7 +1233,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.5,
-        "citation": "Mutton chops — primarily meat with minimal sauce. Goat/lamb muscle ~1.1-2.3 µg/100g raw; bone-in chop ~50-60% meat by served weight. Estimated 0.6 µg/100g."
+        "citation": "Mutton chops — primarily meat with minimal sauce. Goat/lamb muscle ~1.1-2.3 µg/100g raw; bone-in chop ~50-60% meat by served weight. Estimated 0.6 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC230": {
@@ -1129,7 +1243,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.5,
-        "citation": "Keema kofta curry — minced meat (goat/lamb) koftas in curry sauce. Meat proportion ~35-45% in prepared dish. Estimated 0.4 µg/100g."
+        "citation": "Keema kofta curry — minced meat (goat/lamb) koftas in curry sauce. Meat proportion ~35-45% in prepared dish. Estimated 0.4 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC104": {
@@ -1138,7 +1253,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.45,
-        "citation": "Keema parantha/paratha — flatbread stuffed with minced meat. Meat proportion ~20-30% of total weight (mainly dough). Estimated 0.25 µg/100g."
+        "citation": "Keema parantha/paratha — flatbread stuffed with minced meat. Meat proportion ~20-30% of total weight (mainly dough). Estimated 0.25 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC064": {
@@ -1147,7 +1263,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.45,
-        "citation": "Keema pancake — pancake with minced meat filling. Estimated ~25-35% meat by weight. Estimated 0.3 µg/100g."
+        "citation": "Keema pancake — pancake with minced meat filling. Estimated ~25-35% meat by weight. Estimated 0.3 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC246": {
@@ -1157,7 +1274,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Fish curry (Machli curry) — fish in curry sauce. Fish raw ~1-9 µg/100g (species-dependent); ~30-40% fish in curry. USDA FNDDS: Fish curry ≈ 0.4-1.5 µg/100g. Conservative mid-estimate 0.6 µg/100g.",
-        "notes": "Wide range due to unknown fish species. Mid-range estimate used."
+        "notes": "Wide range due to unknown fish species. Mid-range estimate used.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC247": {
@@ -1167,7 +1285,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Fried fish (Indian style) — battered/fried fish pieces. Higher fish proportion than curry (~50-60% fish by weight). Estimated 0.8 µg/100g.",
-        "notes": "Fried fish has less dilution than curry preparations."
+        "notes": "Fried fish has less dilution than curry preparations.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC251": {
@@ -1176,7 +1295,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.5,
-        "citation": "Fish tikka — grilled/tandoor fish pieces with minimal sauce. High fish proportion (~55-65%). Estimated 0.8 µg/100g."
+        "citation": "Fish tikka — grilled/tandoor fish pieces with minimal sauce. High fish proportion (~55-65%). Estimated 0.8 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:BFP230": {
@@ -1186,7 +1306,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Prawn curry (with coconut) — prawns raw ~1.1 µg/100g; ~30-40% prawns in coconut curry. Estimated 0.4 µg/100g.",
-        "notes": "Coconut milk gravy dilutes prawn proportion."
+        "notes": "Coconut milk gravy dilutes prawn proportion.",
+        "basis": "per_100g"
       }
     },
     "indb:OSR027": {
@@ -1195,7 +1316,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.45,
-        "citation": "Prawn sandwich — prawns (~1.1 µg/100g) in sandwich with bread/vegetables. Prawn proportion ~20-30%. Estimated 0.3 µg/100g."
+        "citation": "Prawn sandwich — prawns (~1.1 µg/100g) in sandwich with bread/vegetables. Prawn proportion ~20-30%. Estimated 0.3 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC287": {
@@ -1205,7 +1327,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Paneer kheer — milk-based dessert with paneer. Milk (~0.45 µg/100g) is ~50-60% of prepared dish; paneer adds ~0.8 µg/100g at ~10-15%. Estimated 0.2 µg/100g.",
-        "notes": "Kheer is a milk pudding; B12 contribution primarily from dairy."
+        "notes": "Kheer is a milk pudding; B12 contribution primarily from dairy.",
+        "basis": "per_100g"
       }
     },
     "indb:BFP338": {
@@ -1214,7 +1337,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.5,
-        "citation": "Apple kheer (Seb ki kheer) — milk-based dessert. Milk ~0.45 µg/100g at ~40-50% of prepared dish with sugar/fruit dilution. Estimated 0.15 µg/100g."
+        "citation": "Apple kheer (Seb ki kheer) — milk-based dessert. Milk ~0.45 µg/100g at ~40-50% of prepared dish with sugar/fruit dilution. Estimated 0.15 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC289": {
@@ -1223,7 +1347,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.5,
-        "citation": "Carrot kheer (Gajar ki kheer) — milk-based carrot dessert. Similar to apple kheer. Estimated 0.15 µg/100g."
+        "citation": "Carrot kheer (Gajar ki kheer) — milk-based carrot dessert. Similar to apple kheer. Estimated 0.15 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC291": {
@@ -1232,7 +1357,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.5,
-        "citation": "Moong dal kheer — lentil-based milk pudding. Milk/dairy at ~40-50% with lentil/sugar. Estimated 0.15 µg/100g."
+        "citation": "Moong dal kheer — lentil-based milk pudding. Milk/dairy at ~40-50% with lentil/sugar. Estimated 0.15 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC273": {
@@ -1242,7 +1368,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.55,
         "citation": "Cucumber raita (Kheere ka raita) — yogurt-based salad. USDA SR: Yogurt, plain = 0.37 µg/100g; raita is ~55-65% yogurt/curd with vegetables. Estimated 0.2 µg/100g.",
-        "notes": "Raita is primarily curd/yogurt; B12 from dairy component."
+        "notes": "Raita is primarily curd/yogurt; B12 from dairy component.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC277": {
@@ -1251,7 +1378,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.55,
-        "citation": "Boondi raita — yogurt with fried gram flour balls. Similar yogurt proportion to cucumber raita. Estimated 0.2 µg/100g."
+        "citation": "Boondi raita — yogurt with fried gram flour balls. Similar yogurt proportion to cucumber raita. Estimated 0.2 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC275": {
@@ -1260,7 +1388,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.55,
-        "citation": "Mint raita (Pudinay ka raita) — yogurt-based with mint. Estimated 0.2 µg/100g."
+        "citation": "Mint raita (Pudinay ka raita) — yogurt-based with mint. Estimated 0.2 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:OSR024": {
@@ -1270,7 +1399,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.55,
         "citation": "Sweetened yogurt (Shrikhand) — strained yogurt dessert. Higher dairy concentration than regular yogurt (~70-80% strained curd + sugar). USDA: Yogurt, Greek style ≈ 0.75 µg/100g; shrikhand estimated lower due to sugar dilution. Estimated 0.3 µg/100g.",
-        "notes": "Shrikhand is concentrated strained curd; higher B12 than plain raita."
+        "notes": "Shrikhand is concentrated strained curd; higher B12 than plain raita.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC195": {
@@ -1279,7 +1409,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.5,
-        "citation": "Paneer curry — paneer (~0.8 µg/100g) at ~25-35% in curry gravy. Estimated 0.25 µg/100g."
+        "citation": "Paneer curry — paneer (~0.8 µg/100g) at ~25-35% in curry gravy. Estimated 0.25 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC224": {
@@ -1288,7 +1419,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.5,
-        "citation": "Chilli paneer — stir-fried paneer dish. Similar paneer proportion to paneer curry. Estimated 0.25 µg/100g."
+        "citation": "Chilli paneer — stir-fried paneer dish. Similar paneer proportion to paneer curry. Estimated 0.25 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC226": {
@@ -1297,7 +1429,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.5,
-        "citation": "Kadhai Paneer — paneer in spiced gravy. Similar to paneer curry. Estimated 0.25 µg/100g."
+        "citation": "Kadhai Paneer — paneer in spiced gravy. Similar to paneer curry. Estimated 0.25 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC126": {
@@ -1307,7 +1440,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Curd rice (Dahi bhaat) — rice mixed with yogurt. Yogurt/curd ~40-50% with rice. USDA: Yogurt = 0.37 µg/100g. Estimated 0.2 µg/100g.",
-        "notes": "Common South Indian preparation; primarily rice + curd."
+        "notes": "Common South Indian preparation; primarily rice + curd.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC022": {
@@ -1317,7 +1451,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.55,
         "citation": "Lassi (salted) — diluted yogurt drink. Yogurt ~40-50% with water/ice. USDA: Yogurt = 0.37 µg/100g. Estimated 0.15 µg/100g.",
-        "notes": "Lassi is diluted curd; lower B12 concentration than neat yogurt."
+        "notes": "Lassi is diluted curd; lower B12 concentration than neat yogurt.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC021": {
@@ -1326,7 +1461,8 @@
         "status": "estimated",
         "source_ref": "usda_fndds",
         "confidence": 0.55,
-        "citation": "Sweet Lassi (Meethi lassi) — sweetened diluted yogurt. Similar to salted lassi with sugar addition. Estimated 0.15 µg/100g."
+        "citation": "Sweet Lassi (Meethi lassi) — sweetened diluted yogurt. Similar to salted lassi with sugar addition. Estimated 0.15 µg/100g.",
+        "basis": "per_100g"
       }
     },
     "indb:BFP223": {
@@ -1336,7 +1472,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Bengal fish curry (Bengali machli curry) — fish in mustard/spiced gravy. Bengali fish curries typically use higher fish proportion (~40-50%). Estimated 0.7 µg/100g.",
-        "notes": "Bengali fish curry tends to be fish-forward."
+        "notes": "Bengali fish curry tends to be fish-forward.",
+        "basis": "per_100g"
       }
     },
     "indb:ASC231": {
@@ -1346,7 +1483,8 @@
         "source_ref": "usda_fndds",
         "confidence": 0.5,
         "citation": "Kashmiri mutton koftas (Gushtaba) — meat koftas in yogurt sauce. Goat/lamb ~1.1-2.3 µg/100g raw; ~35-40% meat + yogurt contribution. Estimated 0.5 µg/100g.",
-        "notes": "Gushtaba has both meat and yogurt providing B12."
+        "notes": "Gushtaba has both meat and yogurt providing B12.",
+        "basis": "per_100g"
       }
     }
   }

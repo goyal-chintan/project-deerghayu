@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 from nutrition_normalize import (
     SUPPORTED_NUTRIENTS, normalize_record, make_meta, apply_supplements,
     load_supplements, match_supplement_rules, match_item_overrides,
-    invalidate_supplements_cache, _validate_supplements,
+    invalidate_supplements_cache, _validate_supplements, _is_valid_numeric,
     STATUS_SOURCED, STATUS_DERIVED, STATUS_EXPLICIT_ZERO, STATUS_ESTIMATED,
     STATUS_MISSING,
 )
@@ -53,7 +53,7 @@ def assert_true(condition, msg):
         print(f"  ✗ {msg}")
 
 
-def make_test_record(name, code, group, diet_type, source, nutrition=None):
+def make_test_record(name, code, group, diet_type, source, nutrition=None, serving_grams=None):
     """Create a minimal record and run normalize + supplements."""
     record = {
         "name": name,
@@ -62,6 +62,8 @@ def make_test_record(name, code, group, diet_type, source, nutrition=None):
         "diet_type": diet_type,
         "source": source,
     }
+    if serving_grams is not None:
+        record["serving_grams"] = serving_grams
     source_values = nutrition or {}
     # normalize_record fills all keys
     normalize_record(record, source, source_values)
@@ -475,6 +477,7 @@ rec_afghani = make_test_record(
     group="", diet_type="non-vegetarian",
     source="INDB 2024.11",
     nutrition={"calories": 200, "proteins": 18},
+    serving_grams=189.7,
 )
 assert_true(rec_afghani["nutrition"]["b12"] > 0,
             f"Afghani chicken B12 > 0 (got {rec_afghani['nutrition']['b12']})")
@@ -491,6 +494,7 @@ rec_shrikhand = make_test_record(
     group="", diet_type="vegetarian",
     source="INDB 2024.11",
     nutrition={"calories": 180, "sugars": 20},
+    serving_grams=150.0,
 )
 assert_true(rec_shrikhand["nutrition"]["b12"] > 0,
             f"Shrikhand B12 > 0 (got {rec_shrikhand['nutrition']['b12']})")
@@ -572,6 +576,7 @@ rec_egg_curry = make_test_record(
     group="", diet_type="eggetarian",
     source="INDB 2024.11",
     nutrition={"calories": 150, "proteins": 8},
+    serving_grams=200.0,
 )
 assert_true(rec_egg_curry["nutrition"]["b12"] > 0,
             f"Egg curry B12 > 0 (got {rec_egg_curry['nutrition']['b12']})")
@@ -584,6 +589,7 @@ rec_prawn = make_test_record(
     group="", diet_type="non-vegetarian",
     source="INDB 2024.11",
     nutrition={"calories": 130, "proteins": 10},
+    serving_grams=250.0,
 )
 assert_true(rec_prawn["nutrition"]["b12"] > 0,
             f"Prawn curry B12 > 0 (got {rec_prawn['nutrition']['b12']})")
@@ -683,6 +689,326 @@ try:
 except ValueError as e:
     assert_true("numeric" in str(e).lower(),
                 f"ValueError mentions numeric: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 27] per_100g INDB recipe scaling — Afghani chicken")
+# -----------------------------------------------------------------------
+# Afghani chicken: override B12 = 0.15 per_100g, serving_grams = 189.7
+# Expected stored value = 0.15 * 189.7 / 100 = 0.28455 → rounded to 4dp = 0.2846
+rec_afghani_scaled = make_test_record(
+    name="Afghani chicken", code="OSR062",
+    group="", diet_type="non-vegetarian",
+    source="INDB 2024.11",
+    nutrition={"calories": 200, "proteins": 18},
+    serving_grams=189.7,
+)
+expected_afghani_b12 = round(0.15 * 189.7 / 100, 4)
+assert_eq(rec_afghani_scaled["nutrition"]["b12"], expected_afghani_b12,
+           f"Afghani chicken B12 scaled = {expected_afghani_b12} (per_100g * serving/100)")
+assert_eq(rec_afghani_scaled["nutrition_meta"]["b12"].get("basis"), "per_100g",
+           "Afghani chicken B12 meta retains basis='per_100g'")
+assert_eq(rec_afghani_scaled["nutrition_meta"]["b12"].get("original_value_per_100g"), 0.15,
+           "Afghani chicken B12 meta has original_value_per_100g=0.15")
+
+# -----------------------------------------------------------------------
+print("\n[Test 28] per_100g INDB recipe scaling — Baked egg")
+# -----------------------------------------------------------------------
+# Baked egg: override B12 = 0.8 per_100g, serving_grams = 101.0
+# Expected stored value = 0.8 * 101.0 / 100 = 0.808
+rec_baked_egg = make_test_record(
+    name="Baked egg", code="ASC060",
+    group="", diet_type="eggetarian",
+    source="INDB 2024.11",
+    nutrition={"calories": 170, "proteins": 12},
+    serving_grams=101.0,
+)
+expected_baked_egg_b12 = round(0.8 * 101.0 / 100, 4)
+assert_eq(rec_baked_egg["nutrition"]["b12"], expected_baked_egg_b12,
+           f"Baked egg B12 scaled = {expected_baked_egg_b12} (per_100g * serving/100)")
+assert_true(rec_baked_egg["nutrition_meta"]["b12"].get("citation") is not None,
+            "Baked egg B12 has citation")
+assert_true(rec_baked_egg["nutrition_meta"]["b12"].get("confidence") is not None,
+            "Baked egg B12 has confidence")
+
+# -----------------------------------------------------------------------
+print("\n[Test 29] per_100g INDB override with missing serving_grams raises")
+# -----------------------------------------------------------------------
+try:
+    rec_no_sg = {
+        "name": "Afghani chicken", "code": "OSR062",
+        "group": "", "diet_type": "non-vegetarian",
+        "source": "INDB 2024.11",
+        # No serving_grams field!
+    }
+    normalize_record(rec_no_sg, "INDB 2024.11", {"calories": 200})
+    apply_supplements(rec_no_sg, "OSR062", "Afghani chicken", "",
+                      "non-vegetarian", "INDB 2024.11")
+    assert_true(False, "Should raise ValueError for missing serving_grams")
+except ValueError as e:
+    assert_true("serving_grams" in str(e).lower(),
+                f"ValueError mentions serving_grams: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 30] per_100g INDB override with bool serving_grams raises")
+# -----------------------------------------------------------------------
+try:
+    rec_bool_sg = {
+        "name": "Afghani chicken", "code": "OSR062",
+        "group": "", "diet_type": "non-vegetarian",
+        "source": "INDB 2024.11",
+        "serving_grams": True,
+    }
+    normalize_record(rec_bool_sg, "INDB 2024.11", {"calories": 200})
+    apply_supplements(rec_bool_sg, "OSR062", "Afghani chicken", "",
+                      "non-vegetarian", "INDB 2024.11")
+    assert_true(False, "Should raise ValueError for bool serving_grams")
+except ValueError as e:
+    assert_true("serving_grams" in str(e).lower() and "bool" in str(e).lower(),
+                f"ValueError mentions bool serving_grams: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 31] per_100g INDB override with serving_grams <= 0 raises")
+# -----------------------------------------------------------------------
+try:
+    rec_zero_sg = {
+        "name": "Afghani chicken", "code": "OSR062",
+        "group": "", "diet_type": "non-vegetarian",
+        "source": "INDB 2024.11",
+        "serving_grams": 0,
+    }
+    normalize_record(rec_zero_sg, "INDB 2024.11", {"calories": 200})
+    apply_supplements(rec_zero_sg, "OSR062", "Afghani chicken", "",
+                      "non-vegetarian", "INDB 2024.11")
+    assert_true(False, "Should raise ValueError for serving_grams=0")
+except ValueError as e:
+    assert_true("serving_grams" in str(e).lower(),
+                f"ValueError mentions serving_grams: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 32] Zero override with invalid status is rejected")
+# -----------------------------------------------------------------------
+bad_zero_status = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "caffeine": {
+                "value": 0,
+                "status": "estimated",  # Wrong — must be explicit_zero
+                "source_ref": "test_src",
+                "citation": "Some citation"
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_zero_status)
+    assert_true(False, "Should reject zero override with status 'estimated'")
+except ValueError as e:
+    assert_true("explicit_zero" in str(e),
+                f"ValueError mentions explicit_zero: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 33] Zero override with missing source_ref is rejected")
+# -----------------------------------------------------------------------
+bad_zero_no_src = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "caffeine": {
+                "value": 0,
+                "status": "explicit_zero",
+                # missing source_ref!
+                "citation": "Domain knowledge"
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_zero_no_src)
+    assert_true(False, "Should reject zero override missing source_ref")
+except ValueError as e:
+    assert_true("source_ref" in str(e).lower(),
+                f"ValueError mentions source_ref: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 34] Bool nutrient value is rejected by _is_valid_numeric")
+# -----------------------------------------------------------------------
+assert_eq(_is_valid_numeric(True), False, "_is_valid_numeric(True) = False")
+assert_eq(_is_valid_numeric(False), False, "_is_valid_numeric(False) = False")
+assert_eq(_is_valid_numeric(1), True, "_is_valid_numeric(1) = True")
+assert_eq(_is_valid_numeric(0), True, "_is_valid_numeric(0) = True")
+assert_eq(_is_valid_numeric(0.5), True, "_is_valid_numeric(0.5) = True")
+
+# -----------------------------------------------------------------------
+print("\n[Test 35] Bool value in supplement override is rejected")
+# -----------------------------------------------------------------------
+bad_bool_value = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "b12": {
+                "value": True,  # bool not allowed!
+                "status": "estimated",
+                "source_ref": "test_src",
+                "citation": "Some citation",
+                "confidence": 0.7
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_bool_value)
+    assert_true(False, "Should reject bool value in override")
+except ValueError as e:
+    assert_true("bool" in str(e).lower(),
+                f"ValueError mentions bool: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 36] Bool confidence in supplement override is rejected")
+# -----------------------------------------------------------------------
+bad_bool_conf = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [],
+    "item_overrides": {
+        "ifct:X001": {
+            "b12": {
+                "value": 1.5,
+                "status": "estimated",
+                "source_ref": "test_src",
+                "citation": "Some citation",
+                "confidence": True,  # bool not allowed!
+                "basis": "per_100g"
+            }
+        }
+    },
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_bool_conf)
+    assert_true(False, "Should reject bool confidence in override")
+except ValueError as e:
+    assert_true("bool" in str(e).lower() and "confidence" in str(e).lower(),
+                f"ValueError mentions bool confidence: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 37] Zero rule without description is rejected")
+# -----------------------------------------------------------------------
+bad_rule_no_desc = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [
+        {
+            "id": "bad_zero_rule",
+            "nutrient_id": "caffeine",
+            "value": 0,
+            "status": "explicit_zero",
+            "source_ref": "test_src",
+            # missing description!
+            "match": {}
+        }
+    ],
+    "item_overrides": {},
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_rule_no_desc)
+    assert_true(False, "Should reject zero rule without description")
+except ValueError as e:
+    assert_true("description" in str(e).lower(),
+                f"ValueError mentions description: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 38] Zero rule with wrong status is rejected")
+# -----------------------------------------------------------------------
+bad_rule_wrong_status = {
+    "schema_version": "1.0",
+    "sources": {"test_src": {"name": "Test", "note": "test"}},
+    "rules": [
+        {
+            "id": "bad_status_rule",
+            "nutrient_id": "caffeine",
+            "value": 0,
+            "status": "sourced",  # Wrong — should be explicit_zero for value=0
+            "source_ref": "test_src",
+            "description": "Some description",
+            "match": {}
+        }
+    ],
+    "item_overrides": {},
+    "recipe_overrides": {}
+}
+try:
+    _validate_supplements(bad_rule_wrong_status)
+    assert_true(False, "Should reject zero rule with status 'sourced'")
+except ValueError as e:
+    assert_true("explicit_zero" in str(e),
+                f"ValueError mentions explicit_zero: {e}")
+
+# -----------------------------------------------------------------------
+print("\n[Test 39] IFCT overrides remain per-100g (no scaling)")
+# -----------------------------------------------------------------------
+# Cow milk override: B12 = 0.45 per_100g.
+# IFCT items store per-100g, so no scaling should happen regardless of serving_grams.
+rec_milk_ifct = make_test_record(
+    name="Milk, whole, Cow", code="L002",
+    group="Milk and Milk Products", diet_type="vegetarian",
+    source="IFCT 2017",
+    nutrition={"calories": 67, "fat": 4.1, "proteins": 3.3},
+    serving_grams=250.0,  # Should be ignored for IFCT
+)
+assert_eq(rec_milk_ifct["nutrition"]["b12"], 0.45,
+           "IFCT milk B12 = 0.45 (no scaling, stays per-100g)")
+
+# -----------------------------------------------------------------------
+print("\n[Test 40] Critical override keys exist in supplement data")
+# -----------------------------------------------------------------------
+supplements = load_supplements()
+
+# Key IFCT overrides must exist
+critical_ifct = ["ifct:L001", "ifct:L002", "ifct:M001", "ifct:N005",
+                 "ifct:O032", "ifct:R001", "ifct:T013"]
+for key in critical_ifct:
+    assert_true(key in supplements["item_overrides"],
+                f"Critical IFCT override '{key}' exists")
+    assert_true("b12" in supplements["item_overrides"][key],
+                f"Critical IFCT override '{key}' has 'b12' nutrient")
+
+# Key INDB recipe overrides must exist
+critical_indb = ["indb:OSR062", "indb:ASC060", "indb:ASC056", "indb:BFP240"]
+for key in critical_indb:
+    assert_true(key in supplements["recipe_overrides"],
+                f"Critical INDB override '{key}' exists")
+    override_data = supplements["recipe_overrides"][key]
+    assert_true("b12" in override_data,
+                f"Critical INDB override '{key}' has 'b12' nutrient")
+    assert_true(override_data["b12"].get("basis") in ("per_100g", "per_serving"),
+                f"Critical INDB override '{key}' has valid basis")
+
+# -----------------------------------------------------------------------
+print("\n[Test 41] INDB zero recipe override does not require scaling (0 * anything = 0)")
+# -----------------------------------------------------------------------
+# Hot tea (ASC001) has B12=0 explicit_zero override — no scaling needed
+rec_tea_zero = make_test_record(
+    name="Hot tea (Garam Chai)", code="ASC001",
+    group="", diet_type="vegetarian",
+    source="INDB 2024.11",
+    nutrition={"calories": 35},
+    serving_grams=189.7,
+)
+assert_eq(rec_tea_zero["nutrition"]["b12"], 0,
+           "INDB zero override stays 0 (no scaling effect)")
+assert_eq(rec_tea_zero["nutrition_meta"]["b12"]["status"], STATUS_EXPLICIT_ZERO,
+           "INDB zero override status = explicit_zero")
 
 # -----------------------------------------------------------------------
 # Summary

@@ -49,7 +49,9 @@ SODIUM_MG_PER_SALT_G = 400
 
 
 def _is_valid_numeric(value):
-    """Return True if value is a finite non-negative number."""
+    """Return True if value is a finite non-negative number (not bool)."""
+    if isinstance(value, bool):
+        return False
     if not isinstance(value, (int, float)):
         return False
     if math.isnan(value) or math.isinf(value):
@@ -163,17 +165,28 @@ _supplements_cache = None
 
 # Valid statuses for positive-value overrides (value > 0)
 _POSITIVE_OVERRIDE_STATUSES = {"sourced", "estimated"}
+# Valid basis values for overrides
+_VALID_BASIS = {"per_100g", "per_serving"}
+
+
+def _is_strict_numeric(value):
+    """Return True if value is a finite number (not bool)."""
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, (int, float)) and math.isfinite(value)
 
 
 def _validate_supplements(data):
     """Validate the supplement JSON structure on load.
 
     Checks:
-    - All rules reference defined sources.
+    - All rules reference defined sources and have valid regex patterns.
     - All positive overrides (value > 0) have: source_ref referencing a defined
       source, citation (non-empty string), confidence (numeric 0-1), non-negative
-      numeric value, and valid status ('sourced' or 'estimated').
-    - Zero overrides must have valid status ('explicit_zero').
+      numeric value, valid status ('sourced' or 'estimated'), and basis.
+    - Zero overrides must have status 'explicit_zero', defined source_ref, and
+      citation.
+    - Booleans are rejected for numeric fields (value, confidence).
 
     Raises:
         ValueError: with descriptive message on first validation failure.
@@ -189,15 +202,49 @@ def _validate_supplements(data):
                 f"Rule '{rule_id}': source_ref '{source_ref}' not defined in sources. "
                 f"Defined: {sorted(defined_sources)}"
             )
+        if not source_ref:
+            raise ValueError(f"Rule '{rule_id}': missing required 'source_ref'.")
         if "nutrient_id" not in rule:
             raise ValueError(f"Rule '{rule_id}': missing required 'nutrient_id'.")
         if "value" not in rule:
             raise ValueError(f"Rule '{rule_id}': missing required 'value'.")
-        if not isinstance(rule["value"], (int, float)) or rule["value"] < 0:
+        rule_value = rule["value"]
+        if isinstance(rule_value, bool) or not isinstance(rule_value, (int, float)):
             raise ValueError(
-                f"Rule '{rule_id}': value must be a non-negative number, "
-                f"got {rule['value']!r}."
+                f"Rule '{rule_id}': value must be a non-negative number (not bool), "
+                f"got {rule_value!r}."
             )
+        if rule_value < 0:
+            raise ValueError(
+                f"Rule '{rule_id}': value must be non-negative, got {rule_value}."
+            )
+
+        # Zero rules must have status explicit_zero and description
+        if rule_value == 0:
+            rule_status = rule.get("status")
+            if rule_status != STATUS_EXPLICIT_ZERO:
+                raise ValueError(
+                    f"Rule '{rule_id}': zero-value rule requires status "
+                    f"'explicit_zero', got '{rule_status}'."
+                )
+            rule_desc = rule.get("description")
+            if not rule_desc or not isinstance(rule_desc, str) or not rule_desc.strip():
+                raise ValueError(
+                    f"Rule '{rule_id}': zero-value rule requires non-empty "
+                    f"'description' for provenance."
+                )
+
+        # Validate regex patterns compile correctly
+        for pattern_key in ("exclude_name_patterns",):
+            patterns = rule.get(pattern_key, [])
+            for pi, pat in enumerate(patterns):
+                try:
+                    re.compile(pat)
+                except re.error as e:
+                    raise ValueError(
+                        f"Rule '{rule_id}': invalid regex in {pattern_key}[{pi}] "
+                        f"'{pat}': {e}"
+                    )
 
     # --- Validate item_overrides and recipe_overrides ---
     for section_name in ("item_overrides", "recipe_overrides"):
@@ -216,10 +263,18 @@ def _validate_supplements(data):
                 loc = f"{section_name}['{item_key}']['{nid}']"
                 value = override.get("value")
 
-                # Value must be numeric and non-negative
+                # Value must be numeric (not bool) and non-negative
+                if isinstance(value, bool):
+                    raise ValueError(
+                        f"{loc}: 'value' must be numeric (not bool), got {value!r}."
+                    )
                 if not isinstance(value, (int, float)):
                     raise ValueError(
                         f"{loc}: 'value' must be numeric, got {type(value).__name__}."
+                    )
+                if not math.isfinite(value):
+                    raise ValueError(
+                        f"{loc}: 'value' must be finite, got {value!r}."
                     )
                 if value < 0:
                     raise ValueError(f"{loc}: 'value' must be non-negative, got {value}.")
@@ -255,6 +310,11 @@ def _validate_supplements(data):
                             f"{loc}: positive value ({value}) requires 'confidence' "
                             f"(numeric 0-1)."
                         )
+                    if isinstance(confidence, bool):
+                        raise ValueError(
+                            f"{loc}: 'confidence' must be numeric (not bool), "
+                            f"got {confidence!r}."
+                        )
                     if not isinstance(confidence, (int, float)):
                         raise ValueError(
                             f"{loc}: 'confidence' must be numeric, "
@@ -263,6 +323,31 @@ def _validate_supplements(data):
                     if not (0 <= confidence <= 1):
                         raise ValueError(
                             f"{loc}: 'confidence' must be 0-1, got {confidence}."
+                        )
+                    # Basis is required for positive overrides
+                    basis = override.get("basis")
+                    if basis not in _VALID_BASIS:
+                        raise ValueError(
+                            f"{loc}: positive value requires 'basis' in "
+                            f"{_VALID_BASIS}, got '{basis}'."
+                        )
+
+                # Zero values require explicit_zero status and provenance
+                elif value == 0:
+                    status = override.get("status")
+                    if status != STATUS_EXPLICIT_ZERO:
+                        raise ValueError(
+                            f"{loc}: zero value requires status 'explicit_zero', "
+                            f"got '{status}'."
+                        )
+                    if not source_ref:
+                        raise ValueError(
+                            f"{loc}: zero override requires 'source_ref'."
+                        )
+                    citation = override.get("citation")
+                    if not citation or not isinstance(citation, str) or not citation.strip():
+                        raise ValueError(
+                            f"{loc}: zero override requires non-empty 'citation'."
                         )
 
 
@@ -461,6 +546,7 @@ def match_item_overrides(item_code, item_source):
             "source": source_name,
             "citation": override.get("citation"),
             "confidence": override.get("confidence"),
+            "basis": override.get("basis"),
         }
 
     return results
@@ -514,17 +600,48 @@ def apply_supplements(record, item_code, item_name, item_group, item_diet_type,
 
     # Phase 2: Apply item-specific overrides (positive values / estimates)
     override_results = match_item_overrides(item_code, item_source)
+    is_indb = "INDB" in item_source
     for nid, result in override_results.items():
         current_status = meta.get(nid, {}).get("status")
         # Override applies to 'missing' or 'explicit_zero' (positive data
         # is more informative than a category-level zero rule)
         if current_status in (STATUS_MISSING, STATUS_EXPLICIT_ZERO):
-            nutrition[nid] = result["value"]
-            meta[nid] = make_meta(
+            value = result["value"]
+            basis = result.get("basis")
+
+            # Scale per_100g INDB recipe overrides to per-serving
+            if is_indb and basis == "per_100g" and value > 0:
+                serving_grams = record.get("serving_grams")
+                if isinstance(serving_grams, bool):
+                    raise ValueError(
+                        f"Cannot apply per_100g override for '{nid}' on INDB item "
+                        f"'{item_code}': serving_grams is boolean ({serving_grams!r})."
+                    )
+                if serving_grams is None or not isinstance(serving_grams, (int, float)):
+                    raise ValueError(
+                        f"Cannot apply per_100g override for '{nid}' on INDB item "
+                        f"'{item_code}': serving_grams is missing or non-numeric "
+                        f"({serving_grams!r})."
+                    )
+                if not math.isfinite(serving_grams) or serving_grams <= 0:
+                    raise ValueError(
+                        f"Cannot apply per_100g override for '{nid}' on INDB item "
+                        f"'{item_code}': serving_grams must be >0, "
+                        f"got {serving_grams!r}."
+                    )
+                value = round(value * serving_grams / 100, 4)
+
+            nutrition[nid] = value
+            meta_entry = make_meta(
                 result["status"], result["source"],
                 citation=result.get("citation"),
                 confidence=result.get("confidence"),
             )
+            # Retain basis and original_value for traceability on scaled values
+            if is_indb and basis == "per_100g" and result["value"] > 0:
+                meta_entry["basis"] = basis
+                meta_entry["original_value_per_100g"] = result["value"]
+            meta[nid] = meta_entry
 
     record["nutrition"] = nutrition
     record["nutrition_meta"] = meta
