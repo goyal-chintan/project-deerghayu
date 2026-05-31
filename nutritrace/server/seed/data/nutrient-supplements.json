@@ -1,0 +1,657 @@
+{
+  "schema_version": "1.0",
+  "description": "Audited nutrient supplement rules and item-level overrides for values not present in primary data sources (IFCT 2017, INDB). Rules provide safe explicit-zero assignments; item_overrides supply cited positive values.",
+  "sources": {
+    "usda_sr_legacy": {
+      "name": "USDA FoodData Central, SR Legacy",
+      "url": "https://fdc.nal.usda.gov/",
+      "note": "Standard Reference Legacy database. Values per 100g edible portion."
+    },
+    "domain_b12_plant": {
+      "name": "Nutritional biochemistry — B12 absent in plants",
+      "note": "Plants lack the enzymatic machinery to synthesize active cobalamin (vitamin B12). Fermented plant foods (idli, dosa, tempeh) may contain B12 analogues produced by bacteria, but these are not reliably active cobalamin and are not counted as B12 sources per WHO/FAO guidelines."
+    },
+    "domain_cholesterol_plant": {
+      "name": "Nutritional biochemistry — cholesterol absent in plants",
+      "note": "Cholesterol is synthesized exclusively by animals. Plant sterols (phytosterols) are structurally distinct and not measured as cholesterol."
+    },
+    "domain_caffeine": {
+      "name": "Nutritional biochemistry — caffeine distribution",
+      "note": "Caffeine occurs naturally only in tea (Camellia sinensis), coffee (Coffea spp.), cacao (Theobroma cacao), guarana, yerba mate, and kola nut. Absent from all other plant/animal foods unless added."
+    },
+    "domain_alcohol": {
+      "name": "Nutritional biochemistry — ethanol in foods",
+      "note": "Ethanol (alcohol) is absent from whole foods and cooked preparations unless the food is an alcoholic beverage (fermented/distilled) or uses alcohol as a significant ingredient."
+    }
+  },
+  "rules": [
+    {
+      "id": "b12_zero_plant_ifct",
+      "nutrient_id": "b12",
+      "value": 0,
+      "status": "explicit_zero",
+      "source_ref": "domain_b12_plant",
+      "description": "B12 is zero for unfortified plant foods from IFCT vegetarian groups (excluding dairy).",
+      "match": {
+        "data_source": "IFCT 2017",
+        "diet_type": ["vegetarian"],
+        "groups_include": [
+          "Cereals and Millets",
+          "Condiments and Spices",
+          "Edible Oils and Fats",
+          "Fruits",
+          "Grain Legumes",
+          "Green Leafy Vegetables",
+          "Mushrooms",
+          "Nuts and Oil Seeds",
+          "Other Vegetables",
+          "Roots and Tubers",
+          "Sugars",
+          "Miscellaneous Foods"
+        ]
+      },
+      "exclude_items": ["T013"],
+      "notes": "Excludes Ghee (T013) which is animal-derived dairy fat but classified vegetarian in Indian system. Milk and Milk Products excluded from groups_include because dairy contains B12. Fermented foods (e.g. idli batter from Cereals/Legumes) still get zero — fermentation B12 analogues are not reliable active cobalamin."
+    },
+    {
+      "id": "cholesterol_zero_plant",
+      "nutrient_id": "cholesterol",
+      "value": 0,
+      "status": "explicit_zero",
+      "source_ref": "domain_cholesterol_plant",
+      "description": "Cholesterol is zero for plant-only foods.",
+      "match": {
+        "data_source": "IFCT 2017",
+        "diet_type": ["vegetarian"],
+        "groups_include": [
+          "Cereals and Millets",
+          "Condiments and Spices",
+          "Fruits",
+          "Grain Legumes",
+          "Green Leafy Vegetables",
+          "Mushrooms",
+          "Nuts and Oil Seeds",
+          "Other Vegetables",
+          "Roots and Tubers",
+          "Sugars",
+          "Miscellaneous Foods"
+        ]
+      },
+      "notes": "Excludes Edible Oils and Fats group entirely because Ghee (T013) is animal-derived with significant cholesterol (~256 mg/100g). Other oils in that group are plant-derived (zero cholesterol) but handled via item_overrides to avoid false assignment to Ghee. Milk and Milk Products excluded because dairy contains cholesterol."
+    },
+    {
+      "id": "cholesterol_zero_plant_oils",
+      "nutrient_id": "cholesterol",
+      "value": 0,
+      "status": "explicit_zero",
+      "source_ref": "domain_cholesterol_plant",
+      "description": "Cholesterol is zero for plant-derived oils (Edible Oils and Fats group excluding Ghee).",
+      "match": {
+        "data_source": "IFCT 2017",
+        "groups_include": ["Edible Oils and Fats"]
+      },
+      "exclude_items": ["T013"],
+      "notes": "Ghee (T013) is excluded — it has ~256 mg/100g cholesterol. Vanaspati (T014) is hydrogenated vegetable oil, cholesterol = 0."
+    },
+    {
+      "id": "caffeine_zero_default",
+      "nutrient_id": "caffeine",
+      "value": 0,
+      "status": "explicit_zero",
+      "source_ref": "domain_caffeine",
+      "description": "Caffeine is zero for all foods/recipes except tea, coffee, cocoa/chocolate items.",
+      "match": {
+        "data_source": ["IFCT 2017", "INDB 2024.11"]
+      },
+      "exclude_name_patterns": [
+        "\\btea\\b",
+        "\\bcoffee\\b",
+        "\\bcocoa\\b",
+        "\\bchocolate\\b",
+        "\\bcacao\\b",
+        "\\bguarana\\b",
+        "\\bkehwa\\b",
+        "\\bchai\\b"
+      ],
+      "notes": "Uses word-boundary regex to avoid false matches (e.g. 'steak' does not match 'tea', 'gateau' does not match 'tea'). Kehwa/Chai are Indian tea preparations."
+    },
+    {
+      "id": "alcohol_zero_default",
+      "nutrient_id": "alcohol",
+      "value": 0,
+      "status": "explicit_zero",
+      "source_ref": "domain_alcohol",
+      "description": "Alcohol is zero for all seed foods/recipes unless name indicates alcoholic beverage.",
+      "match": {
+        "data_source": ["IFCT 2017", "INDB 2024.11"]
+      },
+      "exclude_name_patterns": [
+        "\\btoddy\\b",
+        "\\bwine\\b",
+        "\\bbeer\\b",
+        "\\bale\\b",
+        "\\brum\\b",
+        "\\bwhisky\\b",
+        "\\bwhiskey\\b",
+        "\\bbrandy\\b",
+        "\\bvodka\\b",
+        "\\bgin\\b",
+        "\\bliquor\\b",
+        "\\bliqueur\\b",
+        "\\bcocktail\\b",
+        "\\bkahlua\\b",
+        "\\bamaretto\\b"
+      ],
+      "notes": "Uses word-boundary regex. Toddy (K001 in IFCT) is fermented palm sap with ~4-8% alcohol. Word boundaries prevent false matches like 'drumstick' matching 'rum'."
+    },
+    {
+      "id": "added_sugars_zero_conservative",
+      "nutrient_id": "added-sugars",
+      "value": 0,
+      "status": "explicit_zero",
+      "source_ref": "domain_rule",
+      "description": "Added sugars are zero ONLY for whole unprocessed plant/animal foods where total sugars are sourced and the food is clearly not sweetened.",
+      "match": {
+        "data_source": "IFCT 2017",
+        "groups_include": [
+          "Green Leafy Vegetables",
+          "Other Vegetables",
+          "Roots and Tubers",
+          "Fruits",
+          "Grain Legumes",
+          "Cereals and Millets",
+          "Nuts and Oil Seeds",
+          "Mushrooms",
+          "Condiments and Spices",
+          "Edible Oils and Fats",
+          "Fresh Water Fish and Shellfish",
+          "Marine Fish",
+          "Marine Shellfish",
+          "Marine Mollusks",
+          "Poultry",
+          "Animal Meat",
+          "Egg and Egg Products"
+        ],
+        "requires_sourced": ["sugars"]
+      },
+      "exclude_name_patterns": [
+        "\\bsweet\\b",
+        "\\bsugar\\b",
+        "\\bjaggery\\b",
+        "\\bhoney\\b",
+        "\\bjam\\b",
+        "\\bcandy\\b",
+        "\\bprocessed\\b",
+        "\\bfortified\\b"
+      ],
+      "notes": "Only applies when source 'sugars' value is present (sourced), ensuring we know the total sugar content. Excludes the Sugars group entirely (jaggery, sugarcane juice contain natural sugars that might be considered 'added' in processed contexts). Milk excluded because lactose is intrinsic but INDB recipes with milk may have added sugar. This rule does NOT apply to INDB recipes — recipes may have added sugar and we cannot determine from name alone; those remain 'missing' for later validation."
+    }
+  ],
+  "item_overrides": {
+    "ifct:L001": {
+      "b12": {
+        "value": 0.44,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "USDA SR Legacy: Milk, whole, 3.25% milkfat = 0.45 µg/100g. Buffalo milk estimated slightly lower based on comparative dairy literature; conservative 0.44 µg/100g.",
+        "notes": "Buffalo milk B12 not directly in USDA; estimated from cow milk (0.45) with minor adjustment. Indian buffalo milk composition broadly similar to cow milk for B12."
+      }
+    },
+    "ifct:L002": {
+      "b12": {
+        "value": 0.45,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.9,
+        "citation": "USDA SR Legacy NDB#01077: Milk, whole, 3.25% milkfat, with added vitamin D — Vitamin B-12: 0.45 µg/100g."
+      }
+    },
+    "ifct:L003": {
+      "b12": {
+        "value": 0.8,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.6,
+        "citation": "Paneer is fresh unripened cheese from whole milk. USDA SR Legacy: Cheese, cottage, creamed = 0.63 µg/100g; Cheese, ricotta, whole milk = 0.34 µg/100g. Paneer is more concentrated than cottage cheese. Conservative estimate 0.8 µg/100g.",
+        "notes": "No direct USDA entry for Indian paneer. Value estimated from comparable fresh cheeses with concentration factor."
+      }
+    },
+    "ifct:L004": {
+      "b12": {
+        "value": 1.1,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.5,
+        "citation": "Khoa is milk reduced to ~25-30% of original volume (3-4x concentration). Cow milk B12 = 0.45 µg/100g × ~2.5 concentration factor (accounting for some heat degradation) ≈ 1.1 µg/100g.",
+        "notes": "No direct reference for khoa B12. Estimated from milk concentration with conservative heat-loss adjustment. Confidence low due to variability in preparation."
+      }
+    },
+    "ifct:M001": {
+      "b12": {
+        "value": 0.89,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.9,
+        "citation": "USDA SR Legacy NDB#01123: Egg, whole, raw, fresh — Vitamin B-12: 0.89 µg/100g."
+      }
+    },
+    "ifct:M002": {
+      "b12": {
+        "value": 0.09,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.85,
+        "citation": "USDA SR Legacy NDB#01124: Egg, white, raw, fresh — Vitamin B-12: 0.09 µg/100g."
+      }
+    },
+    "ifct:M003": {
+      "b12": {
+        "value": 1.95,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.9,
+        "citation": "USDA SR Legacy NDB#01125: Egg, yolk, raw, fresh — Vitamin B-12: 1.95 µg/100g."
+      }
+    },
+    "ifct:M004": {
+      "b12": {
+        "value": 1.11,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.85,
+        "citation": "USDA SR Legacy NDB#01129: Egg, whole, cooked, hard-boiled — Vitamin B-12: 1.11 µg/100g."
+      }
+    },
+    "ifct:M005": {
+      "b12": {
+        "value": 0.09,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.8,
+        "citation": "USDA SR Legacy: Egg white raw = 0.09 µg/100g. Boiling does not significantly alter B12 in egg white. Estimated same as raw.",
+        "notes": "No separate USDA entry for boiled egg white; assumed equivalent to raw."
+      }
+    },
+    "ifct:M006": {
+      "b12": {
+        "value": 1.95,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.8,
+        "citation": "USDA SR Legacy: Egg yolk raw = 1.95 µg/100g. Hard-boiled whole egg shows slight concentration; yolk B12 estimated same as raw.",
+        "notes": "No separate USDA entry for boiled egg yolk alone."
+      }
+    },
+    "ifct:M007": {
+      "b12": {
+        "value": 0.76,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "USDA SR Legacy NDB#01132: Egg, whole, cooked, omelet — Vitamin B-12: 0.76 µg/100g.",
+        "notes": "Omelet diluted by cooking fat; slightly lower than raw whole egg."
+      }
+    },
+    "ifct:M008": {
+      "b12": {
+        "value": 0.89,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.75,
+        "citation": "Country hen egg assumed similar to commercial poultry egg for B12 content. USDA SR Legacy: Egg, whole, raw = 0.89 µg/100g.",
+        "notes": "No separate B12 data for Indian country hen eggs; assumed equivalent to standard poultry eggs."
+      }
+    },
+    "ifct:M009": {
+      "b12": {
+        "value": 1.11,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "Country hen egg boiled assumed similar to USDA hard-boiled egg (1.11 µg/100g).",
+        "notes": "No separate data for country hen boiled eggs."
+      }
+    },
+    "ifct:M010": {
+      "b12": {
+        "value": 0.76,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "Country hen omelet assumed similar to USDA omelet (0.76 µg/100g).",
+        "notes": "No separate data for country hen omelet."
+      }
+    },
+    "ifct:M011": {
+      "b12": {
+        "value": 5.4,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.85,
+        "citation": "USDA SR Legacy NDB#01138: Egg, duck, whole, fresh, raw — Vitamin B-12: 5.40 µg/100g. Boiled value assumed similar.",
+        "notes": "Duck eggs are notably higher in B12 than chicken eggs."
+      }
+    },
+    "ifct:M012": {
+      "b12": {
+        "value": 5.4,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.85,
+        "citation": "USDA SR Legacy NDB#01138: Egg, duck, whole, fresh, raw — Vitamin B-12: 5.40 µg/100g."
+      }
+    },
+    "ifct:M013": {
+      "b12": {
+        "value": 4.5,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "Duck egg omelet estimated from raw duck egg (5.4 µg/100g) with ~15-20% dilution from cooking fat, similar to chicken omelet reduction pattern.",
+        "notes": "No direct USDA entry for duck egg omelet."
+      }
+    },
+    "ifct:M014": {
+      "b12": {
+        "value": 1.58,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.85,
+        "citation": "USDA SR Legacy NDB#01140: Egg, quail, whole, fresh, raw — Vitamin B-12: 1.58 µg/100g."
+      }
+    },
+    "ifct:M015": {
+      "b12": {
+        "value": 1.58,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.8,
+        "citation": "Quail egg boiled assumed same as raw (1.58 µg/100g); boiling does not significantly degrade B12.",
+        "notes": "No separate USDA entry for boiled quail egg."
+      }
+    },
+    "ifct:O032": {
+      "b12": {
+        "value": 59.3,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.85,
+        "citation": "USDA SR Legacy NDB#13325: Beef, variety meats and by-products, liver, raw — Vitamin B-12: 59.3 µg/100g.",
+        "notes": "Liver is the richest natural source of B12."
+      }
+    },
+    "ifct:O035": {
+      "b12": {
+        "value": 27.5,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.8,
+        "citation": "USDA SR Legacy NDB#13326: Beef, variety meats and by-products, kidneys, raw — Vitamin B-12: 27.5 µg/100g."
+      }
+    },
+    "ifct:O028": {
+      "b12": {
+        "value": 9.0,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "USDA SR Legacy NDB#13320: Beef, variety meats and by-products, brain, raw — Vitamin B-12: 9.0 µg/100g (approximate).",
+        "notes": "Brain tissue is moderately rich in B12."
+      }
+    },
+    "ifct:O031": {
+      "b12": {
+        "value": 8.55,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.8,
+        "citation": "USDA SR Legacy NDB#13321: Beef, variety meats and by-products, heart, raw — Vitamin B-12: 8.55 µg/100g."
+      }
+    },
+    "ifct:O042": {
+      "b12": {
+        "value": 59.3,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "Calf (veal) liver B12 assumed similar to beef liver (59.3 µg/100g). USDA SR Legacy NDB#17190: Veal, variety meats, liver, raw — Vitamin B-12: 60+ µg/100g range.",
+        "notes": "Calf liver may be slightly higher than adult beef liver; conservative estimate used."
+      }
+    },
+    "ifct:O044": {
+      "b12": {
+        "value": 27.5,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.65,
+        "citation": "Calf kidneys B12 assumed similar to beef kidneys (27.5 µg/100g).",
+        "notes": "No separate USDA entry for veal kidneys specifically."
+      }
+    },
+    "ifct:O026": {
+      "b12": {
+        "value": 2.5,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "USDA SR Legacy: Beef, chuck/round cuts, raw — Vitamin B-12 range: 2.0-3.0 µg/100g. Conservative estimate 2.5 µg/100g for beef chops.",
+        "notes": "Muscle meat B12 varies by cut; 2.5 is a conservative mid-range estimate."
+      }
+    },
+    "ifct:O027": {
+      "b12": {
+        "value": 2.4,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "USDA SR Legacy: Beef, round (leg), raw — Vitamin B-12: ~2.4 µg/100g.",
+        "notes": "Lean beef cuts typically 2-3 µg/100g."
+      }
+    },
+    "ifct:O025": {
+      "b12": {
+        "value": 2.6,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "USDA SR Legacy: Beef, chuck/shoulder, raw — Vitamin B-12: ~2.6 µg/100g.",
+        "notes": "Shoulder cuts slightly higher B12 than lean round."
+      }
+    },
+    "ifct:N001": {
+      "b12": {
+        "value": 0.31,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.75,
+        "citation": "USDA SR Legacy NDB#05091: Chicken, broilers or fryers, leg, meat only, raw — Vitamin B-12: 0.31 µg/100g."
+      }
+    },
+    "ifct:N002": {
+      "b12": {
+        "value": 0.31,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.75,
+        "citation": "USDA SR Legacy NDB#05096: Chicken, broilers or fryers, thigh, meat only, raw — Vitamin B-12: 0.31 µg/100g."
+      }
+    },
+    "ifct:N003": {
+      "b12": {
+        "value": 0.34,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.8,
+        "citation": "USDA SR Legacy NDB#05062: Chicken, broilers or fryers, breast, skinless, boneless, meat only, raw — Vitamin B-12: 0.34 µg/100g."
+      }
+    },
+    "ifct:N004": {
+      "b12": {
+        "value": 0.28,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "USDA SR Legacy: Chicken wing, meat only, raw — Vitamin B-12: ~0.28 µg/100g.",
+        "notes": "Wing meat slightly lower B12 than breast/thigh."
+      }
+    },
+    "ifct:P003": {
+      "b12": {
+        "value": 3.19,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.75,
+        "citation": "USDA SR Legacy NDB#15001: Fish, anchovy, European, raw — Vitamin B-12: 3.19 µg/100g.",
+        "notes": "Indian anchovy species may differ slightly but order of magnitude is similar."
+      }
+    },
+    "ifct:P020": {
+      "b12": {
+        "value": 8.71,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.75,
+        "citation": "USDA SR Legacy NDB#15046: Fish, mackerel, Atlantic, raw — Vitamin B-12: 8.71 µg/100g.",
+        "notes": "Indian mackerel (Rastrelliger kanagurta) may differ; Atlantic mackerel used as proxy."
+      }
+    },
+    "ifct:P043": {
+      "b12": {
+        "value": 8.94,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "USDA SR Legacy NDB#15088: Fish, sardine, Atlantic, canned in oil, drained — Vitamin B-12: 8.94 µg/100g. Fresh sardine likely similar range.",
+        "notes": "Sardines are consistently high in B12 across species. Indian sardine (Sardinella longiceps) expected in similar range."
+      }
+    },
+    "ifct:S006": {
+      "b12": {
+        "value": 2.0,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.6,
+        "citation": "USDA SR Legacy: Fish, carp (similar freshwater species), raw — Vitamin B-12: ~1.5-3.0 µg/100g. Rohu (Labeo rohita) estimated at 2.0 µg/100g as conservative mid-range.",
+        "notes": "No direct USDA entry for rohu; carp family used as proxy."
+      }
+    },
+    "ifct:S002": {
+      "b12": {
+        "value": 2.0,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.6,
+        "citation": "Catla (Catla catla) is an Indian major carp. Estimated from USDA freshwater carp B12 range (~1.5-3.0 µg/100g). Conservative estimate 2.0 µg/100g.",
+        "notes": "No direct USDA entry for catla."
+      }
+    },
+    "ifct:S008": {
+      "b12": {
+        "value": 1.1,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.75,
+        "citation": "USDA SR Legacy NDB#15152: Crustaceans, shrimp, mixed species, raw — Vitamin B-12: 1.11 µg/100g."
+      }
+    },
+    "ifct:S009": {
+      "b12": {
+        "value": 1.1,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "Small prawns assumed similar B12 to mixed shrimp species (1.1 µg/100g).",
+        "notes": "Size variation unlikely to significantly affect B12 per 100g."
+      }
+    },
+    "ifct:S010": {
+      "b12": {
+        "value": 1.1,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "Tiger prawns assumed similar to mixed shrimp species (1.1 µg/100g)."
+      }
+    },
+    "ifct:Q001": {
+      "b12": {
+        "value": 11.5,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.75,
+        "citation": "USDA SR Legacy NDB#15136: Crustaceans, crab, blue, raw — Vitamin B-12: 11.5 µg/100g.",
+        "notes": "Indian crab species may differ; blue crab used as proxy. Crabs are consistently high in B12."
+      }
+    },
+    "ifct:R003": {
+      "b12": {
+        "value": 20.0,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "USDA SR Legacy NDB#15166: Mollusks, octopus, common, raw — Vitamin B-12: 20.0 µg/100g.",
+        "notes": "Octopus and mollusks are exceptionally high in B12."
+      }
+    },
+    "ifct:R004": {
+      "b12": {
+        "value": 1.3,
+        "status": "sourced",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.7,
+        "citation": "USDA SR Legacy NDB#15175: Mollusks, squid, mixed species, raw — Vitamin B-12: 1.30 µg/100g."
+      }
+    },
+    "ifct:R005": {
+      "b12": {
+        "value": 1.3,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.65,
+        "citation": "Hard shell squid assumed similar B12 to mixed squid species (1.3 µg/100g)."
+      }
+    },
+    "ifct:T013": {
+      "b12": {
+        "value": 0.6,
+        "status": "estimated",
+        "source_ref": "usda_sr_legacy",
+        "confidence": 0.6,
+        "citation": "Ghee is clarified butter. USDA SR Legacy NDB#01001: Butter, salted — Vitamin B-12: 0.17 µg/100g. Ghee is more concentrated (water removed) but B12 may partially degrade during clarification. Conservative estimate 0.6 µg/100g based on concentration factor ~3x with degradation.",
+        "notes": "Ghee B12 data is sparse. Value is conservative estimate; confidence low."
+      }
+    }
+  },
+  "recipe_overrides": {
+    "_notes": "INDB recipes have no ingredient lists, so exact B12 computation is impossible. Overrides are applied only to clearly named categories. Confidence reflects naming-only inference.",
+    "indb:ASC001": {
+      "b12": {
+        "value": 0,
+        "status": "explicit_zero",
+        "source_ref": "domain_b12_plant",
+        "confidence": 0.9,
+        "citation": "Hot tea (Garam Chai) — tea infusion has zero B12. Even with milk addition, B12 contribution per serving is negligible at beverage dilution.",
+        "notes": "Tea with milk might have trace B12 from milk but at typical dilution (10-20ml milk in 150ml tea) it rounds to 0 per 100g of prepared beverage."
+      }
+    },
+    "indb:ASC002": {
+      "b12": {
+        "value": 0,
+        "status": "explicit_zero",
+        "source_ref": "domain_b12_plant",
+        "confidence": 0.95,
+        "citation": "Instant coffee — coffee infusion has zero B12. Black coffee or coffee with minor milk addition contributes negligible B12 per 100g beverage."
+      }
+    },
+    "indb:ASC003": {
+      "b12": {
+        "value": 0,
+        "status": "explicit_zero",
+        "source_ref": "domain_b12_plant",
+        "confidence": 0.95,
+        "citation": "Espresso coffee — zero B12. Coffee beans contain no cobalamin."
+      }
+    }
+  }
+}
