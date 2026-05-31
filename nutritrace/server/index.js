@@ -48,6 +48,25 @@ seedSmtpFromEnv();
 seedAiFromEnv();
 seedOidcFromEnv();
 
+// ── Auto-seed Indian nutrition data (IFCT foods + INDB recipes) ───────────
+// Idempotent: inserts on first run, updates thereafter. Seeds for the first
+// user found in the database so the group catalogue is always populated.
+import { seedFoods, seedRecipes } from './seed/seed-core.js';
+import { readFileSync } from 'node:fs';
+{
+  const owner = db.prepare('SELECT id FROM users ORDER BY id LIMIT 1').get();
+  if (owner) {
+    const seedDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'seed', 'data');
+    const foods = JSON.parse(readFileSync(path.join(seedDir, 'ifct-foods.json'), 'utf-8'));
+    const recipes = JSON.parse(readFileSync(path.join(seedDir, 'indb-recipes.json'), 'utf-8'));
+    const fRes = seedFoods(db, owner.id, foods);
+    const rRes = seedRecipes(db, owner.id, recipes);
+    if (fRes.inserted || rRes.inserted) {
+      logger.info(`[seed] Indian nutrition data: ${fRes.inserted} foods + ${rRes.inserted} recipes inserted`);
+    }
+  }
+}
+
 const app  = express();
 const PORT = process.env.PORT || 3001;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
