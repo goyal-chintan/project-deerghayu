@@ -45,3 +45,7 @@ data/
 *.db
 *.db-shm
 *.db-wal
+
+# Debug/test artifacts
+.playwright-cli/
+output/

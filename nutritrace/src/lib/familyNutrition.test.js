@@ -141,7 +141,7 @@ test('getMealName and calculateMemberTotals use real nutrition calculation and d
   assert.equal(totals['child-1'].iron, 1.5);
 });
 
-test('summarizeFamilyNutrition classifies threshold status from exact unrounded coverage', () => {
+test('summarizeFamilyNutrition classifies threshold status from rounded display value', () => {
   const summary = summarizeFamilyNutrition({
     members: [{ id: 'child-1', name: 'Aarav', targets: { calories: 1000 } }],
     currentUser: { full_name: 'Chintan' },
@@ -152,8 +152,9 @@ test('summarizeFamilyNutrition classifies threshold status from exact unrounded 
   });
 
   const calories = buildAnalyticsRows(summary).find(row => row.id === 'calories');
+  // 596/1000 = 59.6% → rounds to 60% displayed → classified as 'watch' (threshold is <60 for needs_attention)
   assert.equal(calories.coveragePct, 60);
-  assert.equal(calories.status.key, 'needs_attention');
+  assert.equal(calories.status.key, 'watch');
 });
 
 test('buildAnalyticsRows returns exact percentages, status, affected members, and food moves', () => {

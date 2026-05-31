@@ -160,7 +160,8 @@ export function summarizeFamilyNutrition({
       const rawCoveragePct = (current / target) * 100;
       const coveragePct = Math.min(100, Math.round(rawCoveragePct));
       const info = nutrientInfo(id);
-      const status = getCoverageStatus(rawCoveragePct);
+      // Classify on displayed (rounded) value so users never see "60%" labeled "Needs attention"
+      const status = getCoverageStatus(coveragePct);
       rows.push({ id, label: info.label, unit: info.unit, current, target, coveragePct, status });
     }
     memberSummaries.push({
@@ -188,9 +189,9 @@ export function summarizeFamilyNutrition({
     }
 
     if (targetTotal <= 0) continue;
-    const rawCoveragePct = (currentTotal / targetTotal) * 100;
-    const coveragePct = Math.min(100, Math.round(rawCoveragePct));
-    const status = getCoverageStatus(rawCoveragePct);
+    const coveragePct = Math.min(100, Math.round((currentTotal / targetTotal) * 100));
+    // Classify on displayed (rounded) value for consistency
+    const status = getCoverageStatus(coveragePct);
     analyticsRows.push({
       id,
       label: info.label,
