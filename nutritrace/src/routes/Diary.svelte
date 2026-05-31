@@ -1115,6 +1115,41 @@
     showSuccess(`Added ${food.name} to diary`);
   }
 
+  async function consumeQuickAddHandoff() {
+    const quickAddData = sessionStorage.getItem('nt:quickAdd');
+    if (!quickAddData) return;
+
+    let payload;
+    try {
+      payload = JSON.parse(quickAddData);
+    } catch (err) {
+      sessionStorage.removeItem('nt:quickAdd');
+      console.warn('[diary] quick-add payload was invalid:', err.message);
+      showError('Could not add food to today. Please try again.');
+      return;
+    }
+
+    try {
+      const nutrition = typeof payload.nutrition === 'string'
+        ? JSON.parse(payload.nutrition)
+        : (payload.nutrition || {});
+      const meal = Number.isFinite(Number(payload.meal)) ? Number(payload.meal) : 0;
+      const item = {
+        ...payload,
+        portion: payload.portion || payload.amount || 100,
+        unit: payload.unit || 'g',
+        quantity: payload.quantity || 1,
+        nutrition,
+      };
+      await addDiaryItem(item, meal);
+      sessionStorage.removeItem('nt:quickAdd');
+      showSuccess(`Food added to today: ${item.name || 'item'}`);
+    } catch (err) {
+      console.warn('[diary] quick-add failed:', err.message);
+      showError('Could not add food to today. Please try again.');
+    }
+  }
+
   // Whether this mount is a genuine first load (no cached entry yet) or a
   // re-mount triggered by App.svelte's {#key $location}. The fly-in
   // transitions on meal sections and diary items only fire when this is
@@ -1149,6 +1184,8 @@
       // Make sure currentDate matches what's displayed (may be stale).
       currentDate.set(targetDate);
     }
+
+    await consumeQuickAddHandoff();
 
     // Handle replace flow — food picker added the new item, now delete the old one
     const replaceData = sessionStorage.getItem('nt:replaceItem');
