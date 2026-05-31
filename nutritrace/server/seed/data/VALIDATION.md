@@ -4,7 +4,7 @@ _Generated 2026-05-31 by `scripts/validate_data.py`._
 
 - **Ingredients (IFCT 2017):** 542 foods
 - **Recipes (INDB 2024.11):** 984 dishes (81 use per-100g fallback; rest per realistic serving)
-- **Quarantined at conversion:** 30 recipes (energy/macro contradiction) + 1 sodium fields — see below
+- **Quarantined at conversion:** 30 recipes (energy/macro contradiction) + 1 sodium field — see below
 - **Accuracy bar:** ±10% vs IFCT 2017 published values on anchor foods
 - **Gate result:** ✅ PASS (0 hard issues)
 

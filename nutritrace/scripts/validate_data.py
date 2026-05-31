@@ -218,7 +218,7 @@ def main():
     w(f"- **Recipes (INDB 2024.11):** {len(recipes)} dishes "
       f"({fallback} use per-100g fallback; rest per realistic serving)")
     w(f"- **Quarantined at conversion:** {len(q_contra)} recipes (energy/macro "
-      f"contradiction) + {len(q_sodium)} sodium fields — see below")
+      f"contradiction) + {len(q_sodium)} sodium field{'s' if len(q_sodium) != 1 else ''} — see below")
     w(f"- **Accuracy bar:** ±{int(TOL*100)}% vs IFCT 2017 published values on anchor foods")
     w(f"- **Gate result:** {'❌ FAIL' if hard else '✅ PASS'} ({len(hard)} hard issues)")
     w("")
