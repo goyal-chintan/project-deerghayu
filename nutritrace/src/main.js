@@ -11,6 +11,7 @@ import './styles/animations.css';
 import './styles/buttons.css';
 import './styles/forms.css';
 import './styles/modals.css';
+import { mount } from 'svelte';
 import App from './App.svelte';
 import { DB } from './lib/db.js';
 import { initI18n } from './i18n/index.js';
@@ -39,7 +40,7 @@ DB.init()
       const { loadImageMap } = await import('./lib/platform.js');
       await loadImageMap();
     }
-    new App({ target: document.getElementById('app') });
+    mount(App, { target: document.getElementById('app') });
   })
   .catch(err => {
     console.error('DB init failed:', err);

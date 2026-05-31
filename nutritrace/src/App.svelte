@@ -2,7 +2,7 @@
   import { onMount }   from 'svelte';
   import { fade, slide } from 'svelte/transition';
   import { portal } from './lib/portal.js';
-  import Router, { location } from 'svelte-spa-router';
+  import { location } from 'svelte-spa-router';
 
   import BottomNav from './components/layout/BottomNav.svelte';
   import Sidebar   from './components/layout/Sidebar.svelte';
@@ -14,6 +14,7 @@
   import { locale } from 'svelte-i18n';
   import { currentUser, userMgmtActive, setupRequired, loadAuthState, handleOidcCallback } from './stores/auth.js';
   import { needsNativeSetup, isNative, getNativeMode, getServerUrl, apiUrl } from './lib/platform.js';
+  import { resolveRoute } from './lib/routeResolver.js';
   import { writable } from 'svelte/store';
 
   // Sync state — mirrored from the real sync store (dynamically imported)
@@ -74,6 +75,9 @@
     '/accept-invite':     AcceptInvite,
     '*':                  Diary,
   };
+
+  $: activeRoute = resolveRoute(routes, $location);
+  $: activeRouteParams = activeRoute.params;
 
   const NAV_HIDDEN = ['/wizard', '/foods/edit', '/meal-editor', '/profile'];
   $: showNav       = !NAV_HIDDEN.some(p => $location.startsWith(p));
@@ -502,7 +506,49 @@
     class:has-topbar={showNav}
     in:fade={{ duration: $disableAnimations ? 0 : 180 }}
   >
-    <Router {routes} />
+    {#if activeRoute.route === '/'}
+      <Diary />
+    {:else if activeRoute.route === '/dashboard'}
+      <Dashboard />
+    {:else if activeRoute.route === '/foods'}
+      <Foods />
+    {:else if activeRoute.route === '/foods/edit'}
+      <FoodEditor />
+    {:else if activeRoute.route === '/foods/edit/:id'}
+      <FoodEditor params={activeRouteParams} />
+    {:else if activeRoute.route === '/meal-editor'}
+      <MealEditor />
+    {:else if activeRoute.route === '/meal-editor/:id'}
+      <MealEditor params={activeRouteParams} />
+    {:else if activeRoute.route === '/statistics'}
+      <Statistics />
+    {:else if activeRoute.route === '/wellness'}
+      <Wellness />
+    {:else if activeRoute.route === '/goals'}
+      <Goals />
+    {:else if activeRoute.route === '/family'}
+      <Family />
+    {:else if activeRoute.route === '/planner'}
+      <MealPlanner />
+    {:else if activeRoute.route === '/grocery'}
+      <GroceryList />
+    {:else if activeRoute.route === '/nutrients'}
+      <NutrientExplorer />
+    {:else if activeRoute.route === '/settings'}
+      <Settings />
+    {:else if activeRoute.route === '/wizard'}
+      <Wizard />
+    {:else if activeRoute.route === '/profile'}
+      <Profile />
+    {:else if activeRoute.route === '/forgot-password'}
+      <ForgotPassword />
+    {:else if activeRoute.route === '/reset-password'}
+      <ResetPassword />
+    {:else if activeRoute.route === '/accept-invite'}
+      <AcceptInvite />
+    {:else}
+      <Diary />
+    {/if}
   </div>
 {/key}
 
