@@ -1308,7 +1308,7 @@
   {/if}
 </Sheet>
 
-<BarcodeScanner bind:open={scannerOpen} on:scan={handleScan} on:close={() => scannerOpen = false} />
+<BarcodeScanner bind:open={scannerOpen} on:scan={handleScan} on:scan-label-success={({ detail }) => openEditor(detail.parsed, 'foodList')} on:close={() => scannerOpen = false} />
 
 <!-- Barcode-lookup loading overlay. Deferred reveal (see _armScanIndicator
      above) means fast lookups don't flash this UI; only lookups that run

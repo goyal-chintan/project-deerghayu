@@ -196,6 +196,45 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_foods_sync ON foods(sync_status);
   CREATE INDEX IF NOT EXISTS idx_meals_sync ON meals(sync_status);
   CREATE INDEX IF NOT EXISTS idx_diary_sync ON diary(sync_status);
+
+  CREATE TABLE IF NOT EXISTS family_members (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id      INTEGER,
+    user_id        INTEGER DEFAULT 1,
+    name           TEXT NOT NULL,
+    age            INTEGER,
+    gender         TEXT,
+    weight_kg      REAL,
+    height_cm      REAL,
+    activity_level TEXT,
+    goal_type      TEXT DEFAULT 'maintain',
+    targets        TEXT DEFAULT '{}',
+    created_at     TEXT DEFAULT (datetime('now')),
+    updated_at     TEXT DEFAULT (datetime('now')),
+    deleted_at     TEXT DEFAULT NULL,
+    sync_status    TEXT DEFAULT 'synced'
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_family_members_user ON family_members(user_id);
+  CREATE INDEX IF NOT EXISTS idx_family_members_server ON family_members(server_id);
+  CREATE INDEX IF NOT EXISTS idx_family_members_sync ON family_members(sync_status);
+
+  CREATE TABLE IF NOT EXISTS meal_plans (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id      INTEGER,
+    user_id        INTEGER DEFAULT 1,
+    date           TEXT NOT NULL,
+    meal_type      TEXT NOT NULL,
+    items          TEXT DEFAULT '[]',
+    created_at     TEXT DEFAULT (datetime('now')),
+    updated_at     TEXT DEFAULT (datetime('now')),
+    deleted_at     TEXT DEFAULT NULL,
+    sync_status    TEXT DEFAULT 'synced'
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_meal_plans_user_date ON meal_plans(user_id, date);
+  CREATE INDEX IF NOT EXISTS idx_meal_plans_server ON meal_plans(server_id);
+  CREATE INDEX IF NOT EXISTS idx_meal_plans_sync ON meal_plans(sync_status);
 `;
 
 // ── DB encryption (disabled in v0.39.23+) ─────────────────────────────────
@@ -1383,6 +1422,416 @@ function _parseJson(val, fallback) {
   if (val == null) return fallback;
   if (typeof val === 'object') return val;
   try { return JSON.parse(val); } catch { return fallback; }
+}
+
+// ── Target Calculator (mirrors server/routes/family.js:calculateTargets) ──
+function calculateFamilyTargets(member) {
+  let { age, gender, weight_kg, height_cm, activity_level, goal_type } = member;
+  age = Number(age) || 30;
+  weight_kg = Number(weight_kg) || 60;
+  height_cm = Number(height_cm) || 165;
+  goal_type = goal_type || 'maintain';
+  
+  let bmr = 0;
+  if (age < 2) {
+    bmr = weight_kg * 90;
+  } else {
+    if (gender === 'male' || gender === 'm') {
+      bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) + 5;
+    } else {
+      bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) - 161;
+    }
+  }
+
+  const multipliers = {
+    'sedentary': 1.2,
+    'light': 1.375,
+    'moderate': 1.55,
+    'active': 1.725,
+    'very_active': 1.9
+  };
+  const multiplier = multipliers[activity_level] || 1.2;
+  let calories = Math.round(bmr * multiplier);
+
+  if (goal_type === 'lose_weight') {
+    calories = Math.max(gender === 'male' || gender === 'm' ? 1500 : 1200, calories - 500);
+  } else if (goal_type === 'gain_muscle') {
+    calories += 350;
+  } else if (goal_type === 'pregnancy') {
+    calories += 350;
+  } else if (goal_type === 'lactation') {
+    calories += 500;
+  }
+
+  let proteins = 0;
+  if (goal_type === 'lose_weight') {
+    proteins = Math.round(weight_kg * 1.4);
+  } else if (goal_type === 'gain_muscle') {
+    proteins = Math.round(weight_kg * 1.8);
+  } else if (goal_type === 'pregnancy') {
+    proteins = Math.round(weight_kg * 1.1) + 25;
+  } else if (goal_type === 'lactation') {
+    proteins = Math.round(weight_kg * 1.1) + 19;
+  } else {
+    proteins = Math.round(weight_kg * (age < 2 ? 1.2 : 0.8));
+  }
+
+  let fatPercent = 0.25;
+  if (goal_type === 'lose_weight') {
+    fatPercent = 0.22;
+  } else if (goal_type === 'gain_muscle') {
+    fatPercent = 0.25;
+  }
+  let fat = Math.round((calories * fatPercent) / 9);
+
+  let carbohydrates = Math.round((calories - (proteins * 4) - (fat * 9)) / 4);
+  if (carbohydrates < 50) carbohydrates = 50;
+
+  let calcium = 1000;
+  let iron = 8;
+  let vitamin_a = 900;
+  let vitamin_c = 90;
+  let vitamin_d = 15;
+  let zinc = 12;
+  let fiber = 38;
+  let b9 = 400;
+  let b12 = 2.2;
+  let magnesium = 350;
+  let potassium = 3500;
+
+  const isFemale = (gender === 'female' || gender === 'f');
+
+  if (age < 1) {
+    calcium = 500;
+    iron = 7;
+    vitamin_a = 400;
+    vitamin_c = 40;
+    vitamin_d = 10;
+    zinc = 2.8;
+    fiber = 0;
+    b9 = 80;
+    b12 = 0.5;
+    magnesium = 40;
+    potassium = 700;
+  } else if (age >= 1 && age <= 3) {
+    calcium = 800;
+    iron = 10;
+    vitamin_a = 400;
+    vitamin_c = 45;
+    vitamin_d = 15;
+    zinc = 3.3;
+    fiber = 15;
+    b9 = 150;
+    b12 = 0.9;
+    magnesium = 65;
+    potassium = 2000;
+  } else if (age >= 4 && age <= 6) {
+    calcium = 800;
+    iron = 10;
+    vitamin_a = 400;
+    vitamin_c = 45;
+    vitamin_d = 15;
+    zinc = 5.6;
+    fiber = 20;
+    b9 = 200;
+    b12 = 1.2;
+    magnesium = 110;
+    potassium = 2300;
+  } else if (age >= 7 && age <= 8) {
+    calcium = 800;
+    iron = 10;
+    vitamin_a = 400;
+    vitamin_c = 45;
+    vitamin_d = 15;
+    zinc = 7.0;
+    fiber = 20;
+    b9 = 200;
+    b12 = 1.2;
+    magnesium = 110;
+    potassium = 2300;
+  } else if (age >= 9 && age <= 12) {
+    calcium = 1300;
+    iron = 8;
+    vitamin_a = 600;
+    vitamin_c = 45;
+    vitamin_d = 15;
+    zinc = 8.4;
+    fiber = 26;
+    b9 = 300;
+    b12 = 1.8;
+    magnesium = 200;
+    potassium = 2500;
+  } else if (age >= 13 && age <= 15) {
+    calcium = 1300;
+    iron = isFemale ? 15 : 11;
+    vitamin_a = isFemale ? 700 : 900;
+    vitamin_c = isFemale ? 65 : 75;
+    vitamin_d = 15;
+    zinc = isFemale ? 9.8 : 11.2;
+    fiber = age <= 13 ? 26 : (isFemale ? 26 : 38);
+    b9 = 400;
+    b12 = 2.2;
+    magnesium = isFemale ? 300 : 340;
+    potassium = 3500;
+  } else if (age >= 16 && age <= 17) {
+    calcium = 1300;
+    iron = isFemale ? 15 : 11;
+    vitamin_a = isFemale ? 700 : 900;
+    vitamin_c = isFemale ? 65 : 75;
+    vitamin_d = 15;
+    zinc = isFemale ? 9.8 : 12.5;
+    fiber = isFemale ? 26 : 38;
+    b9 = 400;
+    b12 = 2.2;
+    magnesium = isFemale ? 300 : 340;
+    potassium = 3500;
+  } else {
+    calcium = 1000;
+    iron = isFemale ? 18 : 8;
+    vitamin_a = isFemale ? 700 : 900;
+    vitamin_c = isFemale ? 75 : 90;
+    vitamin_d = 15;
+    zinc = isFemale ? 10.0 : 12.0;
+    fiber = isFemale ? 25 : 38;
+    b9 = 400;
+    b12 = 2.2;
+    magnesium = isFemale ? 310 : 350;
+    potassium = 3500;
+  }
+
+  if (goal_type === 'pregnancy') {
+    calcium = 1200;
+    iron = 27;
+    vitamin_a = 770;
+    vitamin_c = 85;
+    vitamin_d = 15;
+    zinc = 12.0;
+    fiber = 28;
+    b9 = 600;
+    b12 = 2.6;
+    magnesium = age <= 18 ? 335 : 350;
+    potassium = 4000;
+  } else if (goal_type === 'lactation') {
+    calcium = 1200;
+    iron = 9;
+    vitamin_a = 1300;
+    vitamin_c = 120;
+    vitamin_d = 15;
+    zinc = 12.0;
+    fiber = 29;
+    b9 = 500;
+    b12 = 2.8;
+    magnesium = age <= 18 ? 300 : 310;
+    potassium = 4000;
+  }
+
+  return {
+    calories,
+    proteins,
+    carbohydrates,
+    fat,
+    fiber,
+    calcium,
+    iron,
+    zinc,
+    magnesium,
+    potassium,
+    'vitamin-a': vitamin_a,
+    'vitamin-c': vitamin_c,
+    'vitamin-d': vitamin_d,
+    b9,
+    b12
+  };
+}
+
+export async function dbGetFamilyMembers() {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM family_members WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at ASC`,
+    [LOCAL_USER_ID]
+  );
+  return _rows(r).map(m => ({ ...m, targets: _parseJson(m.targets, {}) }));
+}
+
+export async function dbGetFamilyMember(id) {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM family_members WHERE id = ? AND user_id = ?`,
+    [id, LOCAL_USER_ID]
+  );
+  const row = _row(r);
+  return row ? { ...row, targets: _parseJson(row.targets, {}) } : null;
+}
+
+export async function dbCreateFamilyMember(data) {
+  const db = await getDb();
+  let targets = calculateFamilyTargets(data);
+  if (data.custom_targets) {
+    Object.keys(data.custom_targets).forEach(k => {
+      const val = Number(data.custom_targets[k]);
+      if (!isNaN(val) && val > 0) {
+        targets[k] = Math.round(val);
+      }
+    });
+  }
+  const now = new Date().toISOString();
+  const r = await db.run(
+    `INSERT INTO family_members (user_id, name, age, gender, weight_kg, height_cm, activity_level, goal_type, targets, created_at, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    [
+      LOCAL_USER_ID,
+      data.name,
+      data.age != null ? Number(data.age) : null,
+      data.gender || null,
+      data.weight_kg != null ? Number(data.weight_kg) : null,
+      data.height_cm != null ? Number(data.height_cm) : null,
+      data.activity_level || null,
+      data.goal_type || 'maintain',
+      JSON.stringify(targets),
+      now,
+      now
+    ]
+  );
+  const id = r?.changes?.lastId || (await db.query(`SELECT last_insert_rowid() as id`)).values?.[0]?.id;
+  return await dbGetFamilyMember(id);
+}
+
+export async function dbUpdateFamilyMember(id, data) {
+  const db = await getDb();
+  let targets = calculateFamilyTargets(data);
+  if (data.custom_targets) {
+    Object.keys(data.custom_targets).forEach(k => {
+      const val = Number(data.custom_targets[k]);
+      if (!isNaN(val) && val > 0) {
+        targets[k] = Math.round(val);
+      }
+    });
+  }
+  const now = new Date().toISOString();
+  await db.run(
+    `UPDATE family_members
+     SET name = ?, age = ?, gender = ?, weight_kg = ?, height_cm = ?, activity_level = ?, goal_type = ?, targets = ?, updated_at = ?, sync_status = 'pending'
+     WHERE id = ? AND user_id = ?`,
+    [
+      data.name,
+      data.age != null ? Number(data.age) : null,
+      data.gender || null,
+      data.weight_kg != null ? Number(data.weight_kg) : null,
+      data.height_cm != null ? Number(data.height_cm) : null,
+      data.activity_level || null,
+      data.goal_type || 'maintain',
+      JSON.stringify(targets),
+      now,
+      id,
+      LOCAL_USER_ID
+    ]
+  );
+  return await dbGetFamilyMember(id);
+}
+
+export async function dbDeleteFamilyMember(id) {
+  const db = await getDb();
+  const now = new Date().toISOString();
+  await db.run(
+    `UPDATE family_members SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND user_id = ?`,
+    [now, now, id, LOCAL_USER_ID]
+  );
+}
+
+export async function dbGetMealPlans(date) {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM meal_plans WHERE user_id = ? AND date = ? AND deleted_at IS NULL ORDER BY meal_type`,
+    [LOCAL_USER_ID, date]
+  );
+  return _rows(r).map(p => ({ ...p, items: _parseJson(p.items, []) }));
+}
+
+export async function dbGetMealPlansRange(startDate, endDate) {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM meal_plans WHERE user_id = ? AND date >= ? AND date <= ? AND deleted_at IS NULL ORDER BY date, meal_type`,
+    [LOCAL_USER_ID, startDate, endDate]
+  );
+  return _rows(r).map(p => ({ ...p, items: _parseJson(p.items, []) }));
+}
+
+export async function dbGetRecentMealPlans() {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM meal_plans WHERE user_id = ? AND deleted_at IS NULL ORDER BY date DESC LIMIT 50`,
+    [LOCAL_USER_ID]
+  );
+  return _rows(r).map(p => ({ ...p, items: _parseJson(p.items, []) }));
+}
+
+export async function dbCreateMealPlan(data) {
+  const db = await getDb();
+  const now = new Date().toISOString();
+  const r = await db.run(
+    `INSERT INTO meal_plans (user_id, date, meal_type, items, created_at, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+    [
+      LOCAL_USER_ID,
+      data.date,
+      data.meal_type,
+      JSON.stringify(data.items || []),
+      now,
+      now
+    ]
+  );
+  const id = r?.changes?.lastId || (await db.query(`SELECT last_insert_rowid() as id`)).values?.[0]?.id;
+  const plan = await db.query(`SELECT * FROM meal_plans WHERE id = ?`, [id]);
+  const row = _row(plan);
+  return row ? { ...row, items: _parseJson(row.items, []) } : null;
+}
+
+export async function dbUpdateMealPlan(id, data) {
+  const db = await getDb();
+  const now = new Date().toISOString();
+  await db.run(
+    `UPDATE meal_plans
+     SET date = ?, meal_type = ?, items = ?, updated_at = ?, sync_status = 'pending'
+     WHERE id = ? AND user_id = ?`,
+    [
+      data.date,
+      data.meal_type,
+      JSON.stringify(data.items || []),
+      now,
+      id,
+      LOCAL_USER_ID
+    ]
+  );
+  const plan = await db.query(`SELECT * FROM meal_plans WHERE id = ?`, [id]);
+  const row = _row(plan);
+  return row ? { ...row, items: _parseJson(row.items, []) } : null;
+}
+
+export async function dbDeleteMealPlan(id) {
+  const db = await getDb();
+  const now = new Date().toISOString();
+  await db.run(
+    `UPDATE meal_plans SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND user_id = ?`,
+    [now, now, id, LOCAL_USER_ID]
+  );
+}
+
+export async function dbGetGroupFoods() {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM foods WHERE user_id = ? AND visibility = 'group' AND deleted_at IS NULL ORDER BY name ASC`,
+    [LOCAL_USER_ID]
+  );
+  return _rows(r).map(_parseFoodRow);
+}
+
+export async function dbGetGroupMeals(recipesOnly = false) {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM meals WHERE user_id = ? AND is_recipe = ? AND visibility = 'group' AND deleted_at IS NULL ORDER BY name ASC`,
+    [LOCAL_USER_ID, recipesOnly ? 1 : 0]
+  );
+  return _rows(r).map(_parseMealRow);
 }
 
 export { LOCAL_USER_ID };

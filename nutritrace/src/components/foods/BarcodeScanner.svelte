@@ -15,7 +15,9 @@
       }
     };
   }
-  import { barcodeBeep, barcodeFlashlight } from '../../stores/settings.js';
+  import { barcodeBeep, barcodeFlashlight, aiEffectivelyEnabled, envLocks, aiProvider, aiApiKey, aiModel, aiBaseUrl } from '../../stores/settings.js';
+  import { callAI, callAIProxy } from '../../lib/aiChat.js';
+  import { NUTRIMENTS } from '../../lib/nutrition.js';
 
   export let open = false;
 
@@ -463,6 +465,143 @@
     dispatch('scan', { code });
   }
 
+  let ocrLoading = false;
+  let scanLabelFileInput;
+
+  async function _captureLabelPhoto() {
+    if (isNative) {
+      try {
+        const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+        const photo = await Camera.getPhoto({
+          quality: 80,
+          resultType: CameraResultType.Base64,
+          source: CameraSource.Camera,
+          width: 1600,
+        });
+        return { base64: photo.base64String, mimeType: `image/${photo.format || 'jpeg'}` };
+      } catch (err) {
+        console.warn('[BarcodeScanner] Camera capture failed:', err);
+        return null;
+      }
+    }
+    return new Promise((resolve) => {
+      const handler = (e) => {
+        scanLabelFileInput.removeEventListener('change', handler);
+        const file = e.target.files?.[0];
+        if (!file) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result;
+          const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+          if (!m) { resolve(null); return; }
+          resolve({ mimeType: m[1], base64: m[2] });
+        };
+        reader.readAsDataURL(file);
+      };
+      scanLabelFileInput.addEventListener('change', handler);
+      scanLabelFileInput.value = '';
+      scanLabelFileInput.click();
+    });
+  }
+
+  function _buildLabelMessages(provider, image) {
+    const prompt = [
+      'Extract nutrition facts from this label image.',
+      'Return ONLY a JSON object with these keys (omit keys you cannot read):',
+      '  name (string, product name), brand (string), portion (number), unit (string, one of g/ml/oz/fl oz/cup/tsp/tbsp/lb/kg/l/each),',
+      '  per_serving (boolean, true if the listed values are per serving, false if per 100g),',
+      '  calories (kcal), kilojoules (kJ),',
+      '  fat (g), saturated-fat (g), trans-fat (g), polyunsaturated-fat (g), monounsaturated-fat (g),',
+      '  carbohydrates (g), sugars (g), added-sugars (g), fiber (g),',
+      '  proteins (g),',
+      '  sodium (mg), salt (g), potassium (mg), cholesterol (mg),',
+      '  calcium (mg), iron (mg), magnesium (mg), zinc (mg), phosphorus (mg),',
+      '  vitamin-d (µg), vitamin-a (µg), vitamin-c (mg), vitamin-e (mg), vitamin-k (µg),',
+      '  b1 (mg), b2 (mg), b3 (mg), b6 (mg), b9 (µg), b12 (µg),',
+      '  caffeine (mg), alcohol (g)',
+      'Use numbers, not strings. Use the units specified, not the label\'s.',
+      'No commentary, no markdown — JSON only.',
+    ].join('\n');
+    if (provider === 'claude') {
+      return [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: image.mediaType || image.mimeType, data: image.base64 } },
+        { type: 'text', text: prompt },
+      ]}];
+    }
+    if (provider === 'openai' || provider === 'oai-compat') {
+      return [{ role: 'user', content: [
+        { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.base64}` } },
+        { type: 'text', text: prompt },
+      ]}];
+    }
+    if (provider === 'gemini') {
+      return [{ role: 'user', content: prompt, _image: image }];
+    }
+    return [{ role: 'user', content: prompt }];
+  }
+
+  function _parseJsonFromReply(text) {
+    if (!text) return null;
+    const cleaned = text.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+    try { return JSON.parse(cleaned); } catch {}
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (m) { try { return JSON.parse(m[0]); } catch {} }
+    return null;
+  }
+
+  async function scanLabelOcr() {
+    if (ocrLoading) return;
+    detected = true; // disable barcode scanning in background
+    const image = await _captureLabelPhoto();
+    if (!image || !image.base64) {
+      detected = false;
+      return;
+    }
+    ocrLoading = true;
+    try {
+      const provider = $aiProvider || 'claude';
+      const messages = _buildLabelMessages(provider, image);
+      const systemPrompt = 'You are a nutrition label parser. Return JSON only.';
+      const reply = $envLocks.ai
+        ? await callAIProxy({ messages, systemPrompt })
+        : await callAI({
+            provider, apiKey: $aiApiKey, model: $aiModel, baseUrl: $aiBaseUrl,
+            messages, systemPrompt,
+          });
+      const parsed = _parseJsonFromReply(reply);
+      if (!parsed || typeof parsed !== 'object') {
+        const { showError } = await import('../../stores/toast.js');
+        showError('Could not read the label. Try a clearer photo.');
+        detected = false;
+        return;
+      }
+      
+      const foodItem = {
+        name: parsed.name || '',
+        brand: parsed.brand || '',
+        portion: parsed.portion != null ? Number(parsed.portion) : 100,
+        unit: parsed.unit || 'g',
+        nutrition: {},
+      };
+      for (const n of NUTRIMENTS) {
+        const v = parsed[n.id];
+        if (v != null && !isNaN(parseFloat(v))) {
+          foodItem.nutrition[n.id] = parseFloat(v);
+        }
+      }
+
+      open = false;
+      dispatch('scan-label-success', { parsed: foodItem });
+    } catch (e) {
+      console.error('[BarcodeScanner] Label OCR failed:', e);
+      const { showError } = await import('../../stores/toast.js');
+      showError('Scan failed: ' + (e?.message || 'unknown error'));
+      detected = false;
+    } finally {
+      ocrLoading = false;
+    }
+  }
+
   $: if (open && !scanning) {
     if (isNative) startNativeScanner();
     else startScanner();
@@ -513,6 +652,12 @@
     </div>
 
     <div class="ns-bottom">
+      {#if $aiEffectivelyEnabled}
+        <button class="sc-btn" style="margin-bottom:8px" on:click={scanLabelOcr} disabled={ocrLoading}>
+          <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
+          <span>{ocrLoading ? 'Scanning label…' : 'Scan Nutrition Label (AI)'}</span>
+        </button>
+      {/if}
       <div class="ns-manual">
         <input
           class="input"
@@ -593,6 +738,12 @@
             {torchOn ? 'Flash On' : 'Flash Off'}
           </button>
         {/if}
+        {#if $aiEffectivelyEnabled}
+          <button class="sc-btn" on:click={scanLabelOcr} disabled={ocrLoading}>
+            <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
+            <span>{ocrLoading ? 'Scanning label…' : 'Scan Label (AI)'}</span>
+          </button>
+        {/if}
       </div>
 
       <!-- Manual entry -->
@@ -606,6 +757,7 @@
         />
         <button class="btn btn-primary" on:click={doManual}>Look Up</button>
       </div>
+      <input bind:this={scanLabelFileInput} type="file" accept="image/*" capture="environment" style="display:none" />
     </div>
   </div>
 {/if}

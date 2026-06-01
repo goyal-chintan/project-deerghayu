@@ -554,6 +554,23 @@
     }
   }
 
+  function handleOcrSuccess({ detail }) {
+    const parsed = detail.parsed;
+    if (!parsed) return;
+    if (parsed.name) food.name = parsed.name;
+    if (parsed.brand) food.brand = parsed.brand;
+    if (parsed.portion) food.portion = parsed.portion;
+    if (parsed.unit) food.unit = parsed.unit;
+    if (parsed.nutrition) {
+      for (const n of NUTRIMENTS) {
+        const v = parsed.nutrition[n.id];
+        if (v != null && !isNaN(parseFloat(v))) food[n.id] = parseFloat(v);
+      }
+    }
+    food = { ...food };
+    showSuccess('Nutrition extracted from label');
+  }
+
 
   onMount(async () => {
     store = editorState.foodStore || 'foodList';
@@ -1008,7 +1025,7 @@
 </div>
 
 <!-- Inline barcode scanner — fired by the scan button next to the Barcode field -->
-<BarcodeScanner bind:open={editorScannerOpen} on:scan={onEditorScan} on:close={() => editorScannerOpen = false} />
+<BarcodeScanner bind:open={editorScannerOpen} on:scan={onEditorScan} on:scan-label-success={handleOcrSuccess} on:close={() => editorScannerOpen = false} />
 
 <style>
   /* Indented sub-nutrient rows — Saturated Fat under Total Fat, Sugars

@@ -59,9 +59,10 @@ export const NtApiNative = {
     return rows.map(_foodFromDb);
   },
 
-  // In standalone mode, "group foods" = same as own foods (no multi-user)
   async getGroupFoods() {
-    return this.getFoods();
+    const { dbGetGroupFoods } = await import('./db-native.js');
+    const rows = await dbGetGroupFoods();
+    return rows.map(_foodFromDb);
   },
 
   async getFood(id) {
@@ -109,7 +110,9 @@ export const NtApiNative = {
   },
 
   async getGroupMeals() {
-    return this.getMeals();
+    const { dbGetGroupMeals } = await import('./db-native.js');
+    const rows = await dbGetGroupMeals(false);
+    return rows.map(_mealFromDb);
   },
 
   async getRecipes() {
@@ -118,7 +121,9 @@ export const NtApiNative = {
   },
 
   async getGroupRecipes() {
-    return this.getRecipes();
+    const { dbGetGroupMeals } = await import('./db-native.js');
+    const rows = await dbGetGroupMeals(true);
+    return rows.map(_mealFromDb);
   },
 
   async getMeal(id) {
@@ -245,15 +250,69 @@ export const NtApiNative = {
       return await computeAdaptiveTdeeLocal();
     }
     if (path.startsWith('/api/wellness/calories-out')) return _caloriesOutLocal(path);
+    if (path.startsWith('/api/wellness/')) {
+      if (path.endsWith('/config')) return { enabled: false };
+      if (path.endsWith('/status')) return { connected: false };
+    }
+    if (path === '/api/app-config') {
+      return {
+        food_sharing_enabled: false,
+        session_hours: 0,
+        registration_open: false,
+      };
+    }
+    if (path.startsWith('/api/family')) {
+      const { dbGetFamilyMembers } = await import('./db-native.js');
+      return await dbGetFamilyMembers();
+    }
+    if (path.startsWith('/api/meal_plans')) {
+      const { dbGetMealPlans, dbGetMealPlansRange, dbGetRecentMealPlans } = await import('./db-native.js');
+      const q = new URLSearchParams(path.includes('?') ? path.split('?')[1] : '');
+      const date = q.get('date');
+      const startDate = q.get('start_date');
+      const endDate = q.get('end_date');
+      if (date) {
+        return await dbGetMealPlans(date);
+      } else if (startDate && endDate) {
+        return await dbGetMealPlansRange(startDate, endDate);
+      } else {
+        return await dbGetRecentMealPlans();
+      }
+    }
     console.warn(`[NtApiNative] GET ${path} — not available in local mode`);
     return {};
   },
   async post(path, body) {
     if (path.startsWith('/api/fasts')) return _fastsLocalPost(path, body);
+    if (path === '/api/family') {
+      const { dbCreateFamilyMember } = await import('./db-native.js');
+      return await dbCreateFamilyMember(body);
+    }
+    if (path === '/api/meal_plans') {
+      const { dbCreateMealPlan } = await import('./db-native.js');
+      return await dbCreateMealPlan(body);
+    }
     console.warn(`[NtApiNative] POST ${path} — not available in local mode`);
     return {};
   },
-  async put(path)  { console.warn(`[NtApiNative] PUT ${path} — not available in local mode`); return {}; },
+  async put(path, body) {
+    if (path.startsWith('/api/family/')) {
+      const m = path.match(/^\/api\/family\/(\d+)$/);
+      if (m) {
+        const { dbUpdateFamilyMember } = await import('./db-native.js');
+        return await dbUpdateFamilyMember(parseInt(m[1]), body);
+      }
+    }
+    if (path.startsWith('/api/meal_plans/')) {
+      const m = path.match(/^\/api\/meal_plans\/(\d+)$/);
+      if (m) {
+        const { dbUpdateMealPlan } = await import('./db-native.js');
+        return await dbUpdateMealPlan(parseInt(m[1]), body);
+      }
+    }
+    console.warn(`[NtApiNative] PUT ${path} — not available in local mode`);
+    return {};
+  },
   async patch(path, body) {
     if (path.startsWith('/api/fasts')) return _fastsLocalPatch(path, body);
     console.warn(`[NtApiNative] PATCH ${path} — not available in local mode`);
@@ -261,6 +320,22 @@ export const NtApiNative = {
   },
   async del(path)  {
     if (path.startsWith('/api/fasts')) return _fastsLocalDelete(path);
+    if (path.startsWith('/api/family/')) {
+      const m = path.match(/^\/api\/family\/(\d+)$/);
+      if (m) {
+        const { dbDeleteFamilyMember } = await import('./db-native.js');
+        await dbDeleteFamilyMember(parseInt(m[1]));
+        return { success: true };
+      }
+    }
+    if (path.startsWith('/api/meal_plans/')) {
+      const m = path.match(/^\/api\/meal_plans\/(\d+)$/);
+      if (m) {
+        const { dbDeleteMealPlan } = await import('./db-native.js');
+        await dbDeleteMealPlan(parseInt(m[1]));
+        return { success: true };
+      }
+    }
     // Handle clear all data locally
     if (path === '/api/data') {
       const { getDb } = await import('./db-native.js');
@@ -272,6 +347,8 @@ export const NtApiNative = {
       await db.run('DELETE FROM workouts WHERE user_id = 1');
       await db.run('DELETE FROM user_settings WHERE user_id = 1');
       await db.run('DELETE FROM fasts WHERE user_id = 1');
+      await db.run('DELETE FROM family_members WHERE user_id = 1');
+      await db.run('DELETE FROM meal_plans WHERE user_id = 1');
       await db.run('DELETE FROM sync_meta');
       return { ok: true };
     }

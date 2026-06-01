@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CAPACITOR_DEBUG</key>
-	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
@@ -51,5 +49,7 @@
 	<string>NutriTrace uses the camera to scan food barcodes and nutrition labels.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>NutriTrace uses Face ID to sign you in quickly and securely.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>NutriTrace uses the photo library to let you upload images of nutrition labels.</string>
 </dict>
 </plist>
