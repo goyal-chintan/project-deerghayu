@@ -1008,9 +1008,9 @@
     align-items: center;
     gap: 6px;
     border: 1px solid var(--border);
-    border-radius: 20px;
+    border-radius: 22px;
     padding: 8px 16px;
-    min-height: 40px;
+    min-height: 44px;
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
