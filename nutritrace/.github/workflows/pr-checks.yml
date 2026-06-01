@@ -1,0 +1,40 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ feature/*, feature/** ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-size: 20
+          cache: 'npm'
+          cache-dependency-path: nutritrace/package-lock.json
+
+      - name: Install Node Dependencies
+        run: npm ci
+        working-directory: nutritrace
+
+      - name: Build Web App
+        run: npm run build
+        working-directory: nutritrace
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Validate Indian Food & Recipe Seed Data
+        run: |
+          python3 scripts/validate_data.py public/seed-data/ifct-foods.json public/seed-data/indb-recipes.json
+        working-directory: nutritrace
