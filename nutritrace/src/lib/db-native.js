@@ -336,6 +336,14 @@ async function _applySchema(db) {
   } catch (e) {
     console.debug('[db-native] sodium/salt backfill skipped:', e?.message);
   }
+
+  // --- Seed Indian foods & recipes locally ---
+  try {
+    const { seedNativeIfNeeded } = await import('./seed-native.js');
+    await seedNativeIfNeeded(db);
+  } catch (e) {
+    console.error('[db-native] Indian food database seeding failed:', e);
+  }
 }
 
 // Mirror of server/db.js _backfillSodiumSalt. Fills the missing field via
