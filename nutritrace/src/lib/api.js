@@ -80,6 +80,7 @@ const API = {
         } catch (dbErr) {
           console.warn('[api] Local barcode lookup failed:', dbErr);
         }
+        return null; // Local native mode is strictly local/offline; do not hit the network or query Open Food Facts.
       }
 
       const res = await _extFetch(`${this.OFF_BASE}/api/v0/product/${barcode}.json`);

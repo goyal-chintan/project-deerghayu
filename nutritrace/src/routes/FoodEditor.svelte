@@ -422,139 +422,7 @@
     } finally { downloading = false; }
   }
 
-  // ── Scan Label (AI vision) ──────────────────────────────────────────────────
-  // Camera flow: user taps the icon in the Nutrition card header, takes a photo
-  // of the food's nutrition label, the configured AI provider extracts values,
-  // and OVERWRITES the form's nutrition fields (the label is the source of
-  // truth in this moment, distinct from Refresh from OFF which smart-fills).
-  // Gated on $aiEffectivelyEnabled — button is hidden when AI isn't configured.
-  let scanningLabel = false;
-  let scanLabelFileInput;
-
-  async function _captureLabelPhoto() {
-    if (isNative) {
-      try {
-        const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
-        const photo = await Camera.getPhoto({
-          quality: 80, resultType: CameraResultType.Base64,
-          source: CameraSource.Camera, width: 1600,
-        });
-        return { base64: photo.base64String, mimeType: `image/${photo.format || 'jpeg'}` };
-      } catch {
-        return null;
-      }
-    }
-    // Web: trigger the hidden file input + camera capture attribute and resolve
-    // on change. The element lives in the template below.
-    return new Promise((resolve) => {
-      const handler = (e) => {
-        scanLabelFileInput.removeEventListener('change', handler);
-        const file = e.target.files?.[0];
-        if (!file) { resolve(null); return; }
-        const reader = new FileReader();
-        reader.onload = () => {
-          const dataUrl = reader.result;
-          // dataUrl: data:image/jpeg;base64,XXXX → split into mime + base64
-          const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
-          if (!m) { resolve(null); return; }
-          resolve({ mimeType: m[1], base64: m[2] });
-        };
-        reader.readAsDataURL(file);
-      };
-      scanLabelFileInput.addEventListener('change', handler);
-      scanLabelFileInput.value = '';
-      scanLabelFileInput.click();
-    });
-  }
-
-  function _buildLabelMessages(provider, image) {
-    // Build the prompt + image payload. Each provider has its own multimodal
-    // format. Same shape pattern used by Trace.svelte#_buildImageMessage.
-    const prompt = [
-      'Extract nutrition facts from this label image.',
-      'Return ONLY a JSON object with these keys (omit keys you cannot read):',
-      '  name (string, product name), brand (string), portion (number), unit (string, one of g/ml/oz/fl oz/cup/tsp/tbsp/lb/kg/l/each),',
-      '  per_serving (boolean, true if the listed values are per serving, false if per 100g),',
-      '  calories (kcal), kilojoules (kJ),',
-      '  fat (g), saturated-fat (g), trans-fat (g), polyunsaturated-fat (g), monounsaturated-fat (g),',
-      '  carbohydrates (g), sugars (g), added-sugars (g), fiber (g),',
-      '  proteins (g),',
-      '  sodium (mg), salt (g), potassium (mg), cholesterol (mg),',
-      '  calcium (mg), iron (mg), magnesium (mg), zinc (mg), phosphorus (mg),',
-      '  vitamin-d (µg), vitamin-a (µg), vitamin-c (mg), vitamin-e (mg), vitamin-k (µg),',
-      '  b1 (mg), b2 (mg), b3 (mg), b6 (mg), b9 (µg), b12 (µg),',
-      '  caffeine (mg), alcohol (g)',
-      'Use numbers, not strings. Use the units specified, not the label\'s.',
-      'No commentary, no markdown — JSON only.',
-    ].join('\n');
-    if (provider === 'claude') {
-      return [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: image.mimeType, data: image.base64 } },
-        { type: 'text', text: prompt },
-      ]}];
-    }
-    if (provider === 'openai' || provider === 'oai-compat') {
-      return [{ role: 'user', content: [
-        { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.base64}` } },
-        { type: 'text', text: prompt },
-      ]}];
-    }
-    if (provider === 'gemini') {
-      return [{ role: 'user', content: prompt, _image: image }];
-    }
-    return [{ role: 'user', content: prompt }];
-  }
-
-  function _parseJsonFromReply(text) {
-    if (!text) return null;
-    // Strip ```json fences if the model added them despite the prompt.
-    const cleaned = text.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
-    try { return JSON.parse(cleaned); } catch {}
-    // Fallback: extract the first {...} block.
-    const m = cleaned.match(/\{[\s\S]*\}/);
-    if (m) { try { return JSON.parse(m[0]); } catch {} }
-    return null;
-  }
-
-  async function scanLabel() {
-    if (scanningLabel) return;
-    const image = await _captureLabelPhoto();
-    if (!image || !image.base64) return;
-    scanningLabel = true;
-    try {
-      const provider = $aiProvider || 'claude';
-      const messages = _buildLabelMessages(provider, image);
-      const systemPrompt = 'You are a nutrition label parser. Return JSON only.';
-      const reply = $envLocks.ai
-        ? await callAIProxy({ messages, systemPrompt })
-        : await callAI({
-            provider, apiKey: $aiApiKey, model: $aiModel, baseUrl: $aiBaseUrl,
-            messages, systemPrompt,
-          });
-      const parsed = _parseJsonFromReply(reply);
-      if (!parsed || typeof parsed !== 'object') {
-        showError('Could not read the label. Try a clearer photo.');
-        return;
-      }
-      // Overwrite (NOT smart-fill) — the label is the source of truth this moment.
-      // Mirrors the user's preference: refresh-from-off smart-fills (OFF can be
-      // stale), scan-label overwrites (label is what the user is holding now).
-      if (typeof parsed.name === 'string' && parsed.name.trim()) food.name = parsed.name.trim();
-      if (typeof parsed.brand === 'string' && parsed.brand.trim()) food.brand = parsed.brand.trim();
-      if (parsed.portion != null && !isNaN(parseFloat(parsed.portion))) food.portion = parseFloat(parsed.portion);
-      if (typeof parsed.unit === 'string' && parsed.unit.trim()) food.unit = parsed.unit.trim();
-      for (const n of NUTRIMENTS) {
-        const v = parsed[n.id];
-        if (v != null && !isNaN(parseFloat(v))) food[n.id] = parseFloat(v);
-      }
-      food = { ...food };
-      showSuccess('Nutrition extracted from label');
-    } catch (e) {
-      showError('Scan failed: ' + (e?.message || 'unknown error'));
-    } finally {
-      scanningLabel = false;
-    }
-  }
+  // Scan Label operations are fully delegated to the shared BarcodeScanner component.
 
   function handleOcrSuccess({ detail }) {
     const parsed = detail.parsed;
@@ -1081,20 +949,13 @@
     <div class="card editor-card">
       <div class="editor-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
         <span>Nutrition</span>
-        {#if $aiEffectivelyEnabled}
-          <button class="scan-label-btn" on:click={scanLabel} disabled={scanningLabel}
-            title="Take a photo of the nutrition label to fill these fields"
-            aria-label="Scan nutrition label">
-            <span class="material-symbols-rounded scan-icon" class:spin={scanningLabel}>
-              {scanningLabel ? 'progress_activity' : 'photo_camera'}
-            </span>
-            <span>{scanningLabel ? 'Scanning…' : 'Scan Label'}</span>
-          </button>
-        {/if}
+        <button type="button" class="scan-label-btn" on:click={() => { editorScannerOpen = true; }}
+          title="Take a photo of the nutrition label to fill these fields"
+          aria-label="Scan nutrition label">
+          <span class="material-symbols-rounded scan-icon">photo_camera</span>
+          <span>Scan Label</span>
+        </button>
       </div>
-      <!-- Hidden file input for the web Scan Label flow. On native we go
-           through @capacitor/camera directly. -->
-      <input bind:this={scanLabelFileInput} type="file" accept="image/*" capture="environment" style="display:none" />
       {#each displayFields as n}
         {@const _kjMode = n.id === 'calories' && $energyUnit === 'kJ'}
         <div class="form-group" class:nutrient-sub={n.subOf}>
