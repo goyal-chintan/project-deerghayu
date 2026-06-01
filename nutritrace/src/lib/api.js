@@ -96,6 +96,31 @@ const API = {
   async searchByName(query, page) {
     page = page || 1;
     try {
+      const { isNative, getNativeMode } = await import('./platform.js');
+      if (isNative && getNativeMode() === 'local') {
+        try {
+          const { getDb } = await import('./db-native.js');
+          const db = await getDb();
+          const clean = `%${query.trim()}%`;
+          const r = await db.query(
+            `SELECT * FROM foods WHERE (name LIKE ? OR brand LIKE ?) AND deleted_at IS NULL LIMIT 50`,
+            [clean, clean]
+          );
+          const rows = r?.values || [];
+          return rows.map(row => {
+            const categories = row.category ? [row.category] : [];
+            return {
+              ...row,
+              imgUrl: row.img_url || '',
+              categories,
+              nutrition: typeof row.nutrition === 'string' ? JSON.parse(row.nutrition) : (row.nutrition || {}),
+            };
+          });
+        } catch (dbErr) {
+          console.warn('[api] Local search failed:', dbErr);
+        }
+      }
+
       const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=20&page=${page}`;
       const res = await _extFetch(offUrl);
       if (!res.ok) return [];

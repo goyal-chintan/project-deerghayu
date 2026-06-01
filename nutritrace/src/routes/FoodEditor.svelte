@@ -193,6 +193,8 @@
   // normalisation matches the picker-page lookup behaviour.
   let _myFoods = [];
   let duplicateOf = null;
+  let matchedIngredients = [];
+  let ingredientsText = '';
   $: isNewFood = !(params && params.id);
   $: hasBarcode = !!(food.barcode && food.barcode.trim());
 
@@ -567,8 +569,35 @@
         if (v != null && !isNaN(parseFloat(v))) food[n.id] = parseFloat(v);
       }
     }
+    matchedIngredients = parsed.ingredients || [];
+    ingredientsText = parsed.ingredientsText || '';
     food = { ...food };
     showSuccess('Nutrition extracted from label');
+  }
+
+  async function runLocalIngredientMatching() {
+    if (!ingredientsText.trim()) return;
+    try {
+      const { matchAndCalculateRecipeLocally } = await import('../lib/recipeMatcher.js');
+      const res = await matchAndCalculateRecipeLocally(ingredientsText, food.portion || 100);
+      if (res && res.ingredients) {
+        matchedIngredients = res.ingredients;
+        for (const n of NUTRIMENTS) {
+          if (res.nutrition[n.id] != null) {
+            food[n.id] = res.nutrition[n.id];
+          }
+        }
+        food = { ...food };
+        const { showSuccess: toastSuccess } = await import('../stores/toast.js');
+        toastSuccess('Ingredients matched and nutrition calculated!');
+      } else {
+        const { showError } = await import('../stores/toast.js');
+        showError('Could not match any ingredients.');
+      }
+    } catch (e) {
+      const { showError } = await import('../stores/toast.js');
+      showError('Matching failed: ' + e.message);
+    }
   }
 
 
@@ -582,11 +611,15 @@
       // Flatten nested nutrition into top-level fields for editing
       const flatNutrition = (prefill.nutrition && typeof prefill.nutrition === 'object') ? { ...prefill.nutrition } : {};
       food = { ...food, ...prefill, ...flatNutrition };
+      matchedIngredients = prefill.ingredients || [];
+      ingredientsText = prefill.ingredientsText || '';
     } else if (params && params.id) {
       const existing = await NtApi.getFood(params.id).catch(() => null);
       if (existing) {
         const flatNutrition = (existing.nutrition && typeof existing.nutrition === 'object') ? { ...existing.nutrition } : {};
         food = { ...food, ...existing, ...flatNutrition };
+        matchedIngredients = existing.ingredients || [];
+        ingredientsText = existing.ingredientsText || '';
       }
     }
     // Default `linked` to ON when editing an existing food (the user is
@@ -974,6 +1007,47 @@
         <textarea class="input textarea" placeholder="Optional notes" bind:value={food.notes}></textarea>
       </div>
     {/if}
+
+    <!-- Ingredients & Matching Card -->
+    <div class="card editor-card">
+      <div class="editor-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>Ingredients (Local DB Matching)</span>
+        {#if ingredientsText.trim()}
+          <button type="button" class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 12px; height: auto" on:click={runLocalIngredientMatching}>
+            Match & Estimate
+          </button>
+        {/if}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Raw Ingredients List</label>
+        <textarea class="input textarea" style="min-height: 80px" placeholder="Wheat flour, sugar, palm oil..." bind:value={ingredientsText}></textarea>
+      </div>
+
+      {#if matchedIngredients.length > 0}
+        <div class="matched-ingredients-list" style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+          <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--text-2)">
+            Matched Foods & Estimated Weight (Portion: {food.portion}{food.unit}):
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            {#each matchedIngredients as item}
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:4px 0">
+                <span style="color:var(--text-1)">
+                  {item.name} 
+                  {#if item.id == null}
+                    <span style="color:var(--warning,#f59e0b);font-size:11px;margin-left:4px">(No direct database match)</span>
+                  {:else}
+                    <span style="color:var(--accent);font-size:11px;margin-left:4px">(IFCT Seeded)</span>
+                  {/if}
+                </span>
+                <span style="font-variant-numeric:tabular-nums;font-weight:500;color:var(--text-2)">
+                  {item.estPortion} {item.unit}
+                </span>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+    </div>
 
     <!-- Nutrition -->
     <div class="card editor-card">

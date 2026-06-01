@@ -18,6 +18,7 @@
   import { barcodeBeep, barcodeFlashlight, aiEffectivelyEnabled, envLocks, aiProvider, aiApiKey, aiModel, aiBaseUrl } from '../../stores/settings.js';
   import { callAI, callAIProxy } from '../../lib/aiChat.js';
   import { NUTRIMENTS } from '../../lib/nutrition.js';
+  import { parseNutritionTextLocally, matchAndCalculateRecipeLocally } from '../../lib/recipeMatcher.js';
 
   export let open = false;
 
@@ -510,6 +511,7 @@
       'Return ONLY a JSON object with these keys (omit keys you cannot read):',
       '  name (string, product name), brand (string), portion (number), unit (string, one of g/ml/oz/fl oz/cup/tsp/tbsp/lb/kg/l/each),',
       '  per_serving (boolean, true if the listed values are per serving, false if per 100g),',
+      '  ingredients (string, raw ingredients list text on the label),',
       '  calories (kcal), kilojoules (kJ),',
       '  fat (g), saturated-fat (g), trans-fat (g), polyunsaturated-fat (g), monounsaturated-fat (g),',
       '  carbohydrates (g), sugars (g), added-sugars (g), fiber (g),',
@@ -549,7 +551,7 @@
     return null;
   }
 
-  async function scanLabelOcr() {
+  async function scanLabelOcrAI() {
     if (ocrLoading) return;
     detected = true; // disable barcode scanning in background
     const image = await _captureLabelPhoto();
@@ -576,17 +578,41 @@
         return;
       }
       
+      const portion = parsed.portion != null ? Number(parsed.portion) : 100;
+      // If listed values are per 100g (per_serving false) but portion is not 100, we scale nutrients to match portion
+      const factor = (parsed.per_serving === false && portion !== 100) ? (portion / 100) : 1;
+
       const foodItem = {
         name: parsed.name || '',
         brand: parsed.brand || '',
-        portion: parsed.portion != null ? Number(parsed.portion) : 100,
+        portion: portion,
         unit: parsed.unit || 'g',
+        ingredientsText: parsed.ingredients || '',
         nutrition: {},
       };
+
       for (const n of NUTRIMENTS) {
         const v = parsed[n.id];
         if (v != null && !isNaN(parseFloat(v))) {
-          foodItem.nutrition[n.id] = parseFloat(v);
+          foodItem.nutrition[n.id] = parseFloat(v) * factor;
+        }
+      }
+
+      // Match ingredients locally from extracted list
+      if (parsed.ingredients) {
+        try {
+          const matched = await matchAndCalculateRecipeLocally(parsed.ingredients, portion);
+          if (matched && matched.ingredients && matched.ingredients.length > 0) {
+            foodItem.ingredients = matched.ingredients;
+            // Merge matching nutrients if not parsed from label
+            for (const n of NUTRIMENTS) {
+              if (foodItem.nutrition[n.id] == null && matched.nutrition[n.id] != null) {
+                foodItem.nutrition[n.id] = matched.nutrition[n.id];
+              }
+            }
+          }
+        } catch (matchErr) {
+          console.warn('[BarcodeScanner] Local ingredients matching failed on AI path:', matchErr);
         }
       }
 
@@ -594,6 +620,83 @@
       dispatch('scan-label-success', { parsed: foodItem });
     } catch (e) {
       console.error('[BarcodeScanner] Label OCR failed:', e);
+      const { showError } = await import('../../stores/toast.js');
+      showError('Scan failed: ' + (e?.message || 'unknown error'));
+      detected = false;
+    } finally {
+      ocrLoading = false;
+    }
+  }
+
+  async function scanLabelOcrLocal() {
+    if (ocrLoading) return;
+    detected = true; // disable barcode scanning in background
+    const image = await _captureLabelPhoto();
+    if (!image || !image.base64) {
+      detected = false;
+      return;
+    }
+    ocrLoading = true;
+    try {
+      let textDetections = [];
+      if (isNative) {
+        const { Ocr } = await import('@capacitor-community/image-to-text');
+        const res = await Ocr.detectText({ base64: image.base64 });
+        textDetections = res.textDetections || [];
+      } else {
+        const { showError } = await import('../../stores/toast.js');
+        showError('Local OCR requires running on a native device. Please use AI Scan on web.');
+        detected = false;
+        return;
+      }
+
+      if (textDetections.length === 0) {
+        const { showError } = await import('../../stores/toast.js');
+        showError('No text detected on the label. Try a clearer photo.');
+        detected = false;
+        return;
+      }
+
+      const parsed = parseNutritionTextLocally(textDetections);
+      const portion = parsed.portion != null ? Number(parsed.portion) : 100;
+      const factor = (parsed.per_serving === false && portion !== 100) ? (portion / 100) : 1;
+
+      const foodItem = {
+        name: parsed.name || '',
+        brand: parsed.brand || '',
+        portion: portion,
+        unit: parsed.unit || 'g',
+        ingredientsText: parsed.ingredientsText || '',
+        nutrition: {},
+      };
+
+      for (const n of NUTRIMENTS) {
+        const v = parsed.nutrition[n.id];
+        if (v != null && !isNaN(parseFloat(v))) {
+          foodItem.nutrition[n.id] = parseFloat(v) * factor;
+        }
+      }
+
+      if (parsed.ingredientsText) {
+        try {
+          const matched = await matchAndCalculateRecipeLocally(parsed.ingredientsText, portion);
+          if (matched && matched.ingredients && matched.ingredients.length > 0) {
+            foodItem.ingredients = matched.ingredients;
+            for (const n of NUTRIMENTS) {
+              if (foodItem.nutrition[n.id] == null && matched.nutrition[n.id] != null) {
+                foodItem.nutrition[n.id] = matched.nutrition[n.id];
+              }
+            }
+          }
+        } catch (matchErr) {
+          console.warn('[BarcodeScanner] Local ingredients matching failed on Local path:', matchErr);
+        }
+      }
+
+      open = false;
+      dispatch('scan-label-success', { parsed: foodItem });
+    } catch (e) {
+      console.error('[BarcodeScanner] Local label OCR failed:', e);
       const { showError } = await import('../../stores/toast.js');
       showError('Scan failed: ' + (e?.message || 'unknown error'));
       detected = false;
@@ -653,11 +756,15 @@
 
     <div class="ns-bottom">
       {#if $aiEffectivelyEnabled}
-        <button class="sc-btn" style="margin-bottom:8px" on:click={scanLabelOcr} disabled={ocrLoading}>
+        <button class="sc-btn" style="margin-bottom:8px" on:click={scanLabelOcrAI} disabled={ocrLoading}>
           <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
           <span>{ocrLoading ? 'Scanning label…' : 'Scan Nutrition Label (AI)'}</span>
         </button>
       {/if}
+      <button class="sc-btn" style="margin-bottom:8px" on:click={scanLabelOcrLocal} disabled={ocrLoading}>
+        <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
+        <span>{ocrLoading ? 'Scanning label…' : 'Scan Label (Local OCR)'}</span>
+      </button>
       <div class="ns-manual">
         <input
           class="input"
@@ -739,11 +846,15 @@
           </button>
         {/if}
         {#if $aiEffectivelyEnabled}
-          <button class="sc-btn" on:click={scanLabelOcr} disabled={ocrLoading}>
+          <button class="sc-btn" on:click={scanLabelOcrAI} disabled={ocrLoading}>
             <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
             <span>{ocrLoading ? 'Scanning label…' : 'Scan Label (AI)'}</span>
           </button>
         {/if}
+        <button class="sc-btn" on:click={scanLabelOcrLocal} disabled={ocrLoading}>
+          <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
+          <span>{ocrLoading ? 'Scanning label…' : 'Scan Label (Local)'}</span>
+        </button>
       </div>
 
       <!-- Manual entry -->

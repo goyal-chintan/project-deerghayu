@@ -10,6 +10,8 @@ PODS:
   - CapacitorCamera (8.2.0):
     - Capacitor
     - IONCameraLib (~> 1.0.4)
+  - CapacitorCommunityImageToText (8.0.0):
+    - Capacitor
   - CapacitorCommunitySpeechRecognition (7.0.1):
     - Capacitor
   - CapacitorCommunitySqlite (8.1.0):
@@ -96,6 +98,7 @@ DEPENDENCIES:
   - "CapacitorApp (from `../../node_modules/@capacitor/app`)"
   - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
+  - "CapacitorCommunityImageToText (from `../../node_modules/@capacitor-community/image-to-text`)"
   - "CapacitorCommunitySpeechRecognition (from `../../node_modules/@capacitor-community/speech-recognition`)"
   - "CapacitorCommunitySqlite (from `../../node_modules/@capacitor-community/sqlite`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
@@ -137,6 +140,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/browser"
   CapacitorCamera:
     :path: "../../node_modules/@capacitor/camera"
+  CapacitorCommunityImageToText:
+    :path: "../../node_modules/@capacitor-community/image-to-text"
   CapacitorCommunitySpeechRecognition:
     :path: "../../node_modules/@capacitor-community/speech-recognition"
   CapacitorCommunitySqlite:
@@ -166,6 +171,7 @@ SPEC CHECKSUMS:
   CapacitorApp: 449ffe26375e96f8aaaee625ac6e01e5c57c8650
   CapacitorBrowser: c987c73d09d8bd3b5ec13f06338b1e14d5d2be69
   CapacitorCamera: 8f6acf83664118321111e76acef86390211ccb08
+  CapacitorCommunityImageToText: 844f6cb80c8651f32cbd4e9368e8ac228c72d6e4
   CapacitorCommunitySpeechRecognition: 3e03566c44c2bb3b52391a33d4518b1adbdeb38f
   CapacitorCommunitySqlite: eac6acfb852f46e7988fc59604d7f900498d354e
   CapacitorCordova: c07921bdcfec6f691bae22274446b4d606ebf6a4
@@ -193,6 +199,6 @@ SPEC CHECKSUMS:
   SQLCipher: eb79c64049cb002b4e9fcb30edb7979bf4706dfc
   ZIPFoundation: dfd3d681c4053ff7e2f7350bc4e53b5dba3f5351
 
-PODFILE CHECKSUM: 056e20017c28a8edc647d5c9276147b2eb2246bc
+PODFILE CHECKSUM: de594541fdd1488beff59d907864de7c274e7cd9
 
 COCOAPODS: 1.16.2
