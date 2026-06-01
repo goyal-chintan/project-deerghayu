@@ -1006,18 +1006,20 @@
   .sc-btn {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 5px 12px;
-    font-size: 12px;
+    border-radius: 20px;
+    padding: 8px 16px;
+    min-height: 40px;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
     background: var(--surface-1);
     color: var(--text-2);
     white-space: nowrap;
     transition: background var(--dur-fast), color var(--dur-fast);
   }
-  .sc-btn .material-symbols-rounded { font-size: 14px; }
+  .sc-btn .material-symbols-rounded { font-size: 18px; }
   .sc-btn.sc-btn-active { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); border-color: var(--accent); }
   .sc-btn.sc-btn-torch  { background: color-mix(in srgb, #fbbf24 20%, transparent); color: #fbbf24; border-color: #fbbf24; }
 
@@ -1057,8 +1059,8 @@
     background: rgba(0,0,0,0.5);
     color: #fff;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
   .ns-torch.active { background: rgba(251,191,36,0.85); color: #000; }
   .ns-status {
@@ -1104,9 +1106,17 @@
   }
   .ns-bottom .sc-btn {
     align-self: center;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0,0,0,0.65);
     color: #fff;
-    border-color: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.25);
+    min-height: 44px;
+    padding: 10px 20px;
+    border-radius: 22px;
+    font-size: 13px;
+    font-weight: 600;
+    width: 90%;
+    max-width: 320px;
+    justify-content: center;
   }
   .ns-bottom .sc-btn.sc-btn-active {
     background: color-mix(in srgb, var(--accent) 80%, transparent);

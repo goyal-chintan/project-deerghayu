@@ -600,6 +600,30 @@
     }
   }
 
+  function recalculateNutritionFromMatchedList() {
+    // Reset calculated values to 0
+    for (const n of NUTRIMENTS) {
+      food[n.id] = 0;
+    }
+    matchedIngredients.forEach(item => {
+      const portion = parseFloat(item.estPortion) || 0;
+      const portionFactor = portion / (item.portion || 100);
+      for (const n of NUTRIMENTS) {
+        const val = parseFloat(item.nutrition[n.id]);
+        if (!isNaN(val)) {
+          food[n.id] = (food[n.id] || 0) + val * portionFactor;
+        }
+      }
+    });
+    // Round to 1 decimal place
+    for (const n of NUTRIMENTS) {
+      if (food[n.id] != null) {
+        food[n.id] = Math.round(food[n.id] * 10) / 10;
+      }
+    }
+    food = { ...food };
+  }
+
 
   onMount(async () => {
     store = editorState.foodStore || 'foodList';
@@ -1010,17 +1034,18 @@
 
     <!-- Ingredients & Matching Card -->
     <div class="card editor-card">
-      <div class="editor-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div class="editor-card-title">
         <span>Ingredients (Local DB Matching)</span>
-        {#if ingredientsText.trim()}
-          <button type="button" class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 12px; height: auto" on:click={runLocalIngredientMatching}>
-            Match & Estimate
-          </button>
-        {/if}
       </div>
       <div class="form-group">
         <label class="form-label">Raw Ingredients List</label>
         <textarea class="input textarea" style="min-height: 80px" placeholder="Wheat flour, sugar, palm oil..." bind:value={ingredientsText}></textarea>
+        {#if ingredientsText.trim()}
+          <button type="button" class="btn btn-secondary" style="width: 100%; min-height: 44px; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px" on:click={runLocalIngredientMatching}>
+            <span class="material-symbols-rounded" style="font-size: 20px">hdr_strong</span>
+            <span>Match & Estimate</span>
+          </button>
+        {/if}
       </div>
 
       {#if matchedIngredients.length > 0}
@@ -1028,7 +1053,7 @@
           <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--text-2)">
             Matched Foods & Estimated Weight (Portion: {food.portion}{food.unit}):
           </div>
-          <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;flex-direction:column;gap:8px">
             {#each matchedIngredients as item}
               <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:4px 0">
                 <span style="color:var(--text-1)">
@@ -1039,9 +1064,12 @@
                     <span style="color:var(--accent);font-size:11px;margin-left:4px">(IFCT Seeded)</span>
                   {/if}
                 </span>
-                <span style="font-variant-numeric:tabular-nums;font-weight:500;color:var(--text-2)">
-                  {item.estPortion} {item.unit}
-                </span>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <input class="input" type="number" step="0.1" style="width:75px;padding:6px 8px;text-align:right;height:40px;font-size:13px;border:1px solid var(--border);border-radius:var(--radius-sm,#8px)"
+                    bind:value={item.estPortion}
+                    on:input={recalculateNutritionFromMatchedList} />
+                  <span style="color:var(--text-2);font-weight:500">{item.unit}</span>
+                </div>
               </div>
             {/each}
           </div>
