@@ -11,7 +11,7 @@
   import Toggle from '../components/settings/Toggle.svelte';
   import UnitPicker from '../components/ui/UnitPicker.svelte';
   import { takePhoto } from '../lib/camera.js';
-  import { isNative } from '../lib/platform.js';
+  import { isNative, getNativeMode } from '../lib/platform.js';
   import BarcodeScanner from '../components/foods/BarcodeScanner.svelte';
   import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, energyUnit, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
   import { DIET_TYPES, DIET_LABELS } from '../lib/dietType.js';
@@ -196,6 +196,7 @@
   let ingredientsText = '';
   $: isNewFood = !(params && params.id);
   $: hasBarcode = !!(food.barcode && food.barcode.trim());
+  $: isNativeLocal = isNative && getNativeMode() === 'local';
 
   function _normBarcode(b) {
     return String(b || '').trim().replace(/^0+/, '');
@@ -226,7 +227,7 @@
     const looksEmpty = !food.name?.trim() && !food.brand?.trim() &&
       (food.nutrition == null || Object.keys(food.nutrition || {}).length === 0) &&
       !NUTRIMENTS.some(n => food[n.id] != null && food[n.id] !== '');
-    if (looksEmpty) {
+    if (looksEmpty && !isNativeLocal) {
       // Re-use the existing smart-fill that only writes empty fields.
       await downloadFromOFF();
     } else {
@@ -243,6 +244,7 @@
   let _lastCheckedBarcode = null;
 
   async function _refreshOffPresence() {
+    if (isNativeLocal) { offProductExists = null; return; }
     if (!food.barcode) { offProductExists = null; return; }
     if (_lastCheckedBarcode === food.barcode) return; // no-op refresh
     _lastCheckedBarcode = food.barcode;
@@ -274,6 +276,7 @@
   }
 
   async function shareOrViewOnOFF() {
+    if (isNativeLocal) return;
     if (offProductExists) {
       await _openOffPage();
       return;
@@ -396,6 +399,7 @@
   }
 
   async function downloadFromOFF() {
+    if (isNativeLocal) return;
     if (!food.barcode) return;
     downloading = true; downloadSuccess = false;
     try {
@@ -821,7 +825,7 @@
             }}>Open existing →</button>
           </div>
         {/if}
-        {#if hasBarcode}
+        {#if hasBarcode && !isNativeLocal}
           <div class="form-row" style="gap:8px;margin-top:8px">
             <button class="btn btn-secondary" style="flex:1"
               on:click={shareOrViewOnOFF} disabled={contributing}>
