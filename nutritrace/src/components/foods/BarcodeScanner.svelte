@@ -19,6 +19,7 @@
   import { callAI, callAIProxy } from '../../lib/aiChat.js';
   import { NUTRIMENTS } from '../../lib/nutrition.js';
   import { parseNutritionTextLocally, matchAndCalculateRecipeLocally } from '../../lib/recipeMatcher.js';
+  import Dialog from '../ui/Dialog.svelte';
 
   export let open = false;
 
@@ -39,6 +40,11 @@
   let scanning = false;
   $: _isNativeLocal = isNative && getNativeMode() === 'local';
   $: _canUseAiLabelScan = $aiEffectivelyEnabled && !_isNativeLocal;
+
+  /** AI OCR privacy opt-in state */
+  let showAiOcrConfirm = false;
+  let _pendingAiOcrScan = null; // holds the closure to resume scan after opt-in
+  $: _aiOcrOptedIn = typeof localStorage !== 'undefined' && localStorage.getItem('nt:aiOcrOptedIn') === 'true';
 
   // CSS injected for quagga/html5qr video fill
   let styleEl = null;
@@ -555,6 +561,41 @@
 
   async function scanLabelOcrAI() {
     if (ocrLoading) return;
+
+    // Privacy gate: confirm before sending photo to cloud AI
+    const optedIn = typeof localStorage !== 'undefined' && localStorage.getItem('nt:aiOcrOptedIn') === 'true';
+    if (!optedIn) {
+      // Store a closure that will resume the scan after opt-in confirmation
+      _pendingAiOcrScan = async () => {
+        _pendingAiOcrScan = null;
+        await _doScanLabelOcrAI();
+      };
+      showAiOcrConfirm = true;
+      return;
+    }
+
+    await _doScanLabelOcrAI();
+  }
+
+  function _onAiOcrConfirm() {
+    showAiOcrConfirm = false;
+    try { localStorage.setItem('nt:aiOcrOptedIn', 'true'); } catch {}
+    // Resume the pending scan if one was queued
+    if (_pendingAiOcrScan) {
+      _pendingAiOcrScan();
+    }
+  }
+
+  function _onAiOcrCancel() {
+    showAiOcrConfirm = false;
+    _pendingAiOcrScan = null;
+    // Re-enable barcode scanning if it was disabled
+    detected = false;
+  }
+
+  /** Internal — performs the actual AI OCR scan (called after privacy opt-in gate) */
+  async function _doScanLabelOcrAI() {
+    if (ocrLoading) return;
     detected = true; // disable barcode scanning in background
     const image = await _captureLabelPhoto();
     if (!image || !image.base64) {
@@ -642,9 +683,9 @@
     try {
       let textDetections = [];
       if (isNative) {
-        const { Ocr } = await import('@capacitor-community/image-to-text');
-        const res = await Ocr.detectText({ base64: image.base64 });
-        textDetections = res.textDetections || [];
+        const { Ocr } = await import('@jcesarmobile/capacitor-ocr');
+        const res = await Ocr.process({ image: `data:${image.mimeType};base64,${image.base64}` });
+        textDetections = res.results || [];
       } else {
         const { showError } = await import('../../stores/toast.js');
         showError('Local OCR requires running on a native device. Please use AI Scan on web.');
@@ -762,6 +803,12 @@
           <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
           <span>{ocrLoading ? 'Scanning label…' : 'Scan Nutrition Label (AI)'}</span>
         </button>
+        {#if _aiOcrOptedIn}
+          <div class="ns-ai-indicator">
+            <span class="material-symbols-rounded" style="font-size:14px">cloud_upload</span>
+            <span>AI sends photos to cloud</span>
+          </div>
+        {/if}
       {/if}
       <button class="sc-btn" style="margin-bottom:8px" on:click={scanLabelOcrLocal} disabled={ocrLoading}>
         <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
@@ -852,6 +899,12 @@
             <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
             <span>{ocrLoading ? 'Scanning label…' : 'Scan Label (AI)'}</span>
           </button>
+          {#if _aiOcrOptedIn}
+            <span class="ai-indicator">
+              <span class="material-symbols-rounded" style="font-size:14px">cloud_upload</span>
+              AI sends photos to cloud
+            </span>
+          {/if}
         {/if}
         <button class="sc-btn" on:click={scanLabelOcrLocal} disabled={ocrLoading}>
           <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
@@ -874,6 +927,17 @@
     </div>
   </div>
 {/if}
+
+<!-- AI OCR privacy confirmation dialog -->
+<Dialog
+  open={showAiOcrConfirm}
+  title="AI Photo Upload"
+  message="Send photo to AI for parsing? Your photo will be uploaded to {$aiProvider || 'the AI provider'} for processing. You can change this later in settings."
+  confirmText="Allow"
+  cancelText="Cancel"
+  on:confirm={_onAiOcrConfirm}
+  on:cancel={_onAiOcrCancel}
+/>
 
 <style>
   .scanner-backdrop {
@@ -1024,6 +1088,14 @@
   .sc-btn .material-symbols-rounded { font-size: 18px; }
   .sc-btn.sc-btn-active { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); border-color: var(--accent); }
   .sc-btn.sc-btn-torch  { background: color-mix(in srgb, #fbbf24 20%, transparent); color: #fbbf24; border-color: #fbbf24; }
+  .ai-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-3);
+    white-space: nowrap;
+  }
 
   .scanner-manual {
     display: flex;
@@ -1119,6 +1191,16 @@
     width: 90%;
     max-width: 320px;
     justify-content: center;
+  }
+  .ns-ai-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.7);
+    margin-top: -4px;
+    margin-bottom: 4px;
   }
   .ns-bottom .sc-btn.sc-btn-active {
     background: color-mix(in srgb, var(--accent) 80%, transparent);
