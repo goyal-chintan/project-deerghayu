@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { fly } from 'svelte/transition';
-  import { isNative } from '../../lib/platform.js';
+  import { isNative, getNativeMode } from '../../lib/platform.js';
 
   // Portal to document.body — prevents position:fixed being trapped by
   // ancestor transforms or opacity transitions (common iOS issue)
@@ -37,6 +37,8 @@
   let manualCode = '';
   let scanlineVisible = false;
   let scanning = false;
+  $: _isNativeLocal = isNative && getNativeMode() === 'local';
+  $: _canUseAiLabelScan = $aiEffectivelyEnabled && !_isNativeLocal;
 
   // CSS injected for quagga/html5qr video fill
   let styleEl = null;
@@ -755,7 +757,7 @@
     </div>
 
     <div class="ns-bottom">
-      {#if $aiEffectivelyEnabled}
+      {#if _canUseAiLabelScan}
         <button class="sc-btn" style="margin-bottom:8px" on:click={scanLabelOcrAI} disabled={ocrLoading}>
           <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
           <span>{ocrLoading ? 'Scanning label…' : 'Scan Nutrition Label (AI)'}</span>
@@ -845,7 +847,7 @@
             {torchOn ? 'Flash On' : 'Flash Off'}
           </button>
         {/if}
-        {#if $aiEffectivelyEnabled}
+        {#if _canUseAiLabelScan}
           <button class="sc-btn" on:click={scanLabelOcrAI} disabled={ocrLoading}>
             <span class="material-symbols-rounded" class:spin={ocrLoading}>{ocrLoading ? 'progress_activity' : 'photo_camera'}</span>
             <span>{ocrLoading ? 'Scanning label…' : 'Scan Label (AI)'}</span>

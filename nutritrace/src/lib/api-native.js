@@ -10,7 +10,7 @@
 
 import {
   dbGetFoods, dbGetFood, dbCreateFood, dbUpdateFood, dbDeleteFood, dbCopyFood, dbBumpFoodUsage,
-  dbGetMeals, dbGetMeal, dbCreateMeal, dbUpdateMeal, dbDeleteMeal, dbCopyMeal, dbBumpMealUsage,
+  dbGetGroupFoods, dbGetMeals, dbGetGroupMeals, dbGetMeal, dbCreateMeal, dbUpdateMeal, dbDeleteMeal, dbCopyMeal, dbBumpMealUsage,
   dbGetDiaryDate, dbSaveDiaryDate, dbGetAllDiary,
   dbGetActivity, dbGetActivityRange, dbSumActivity, dbWearableActiveCalories,
   dbCreateActivity, dbUpdateActivity, dbDeleteActivity,
@@ -55,12 +55,12 @@ export const NtApiNative = {
   // ── Foods ─────────────────────────────────────────────────────────────
 
   async getFoods() {
-    const rows = await dbGetFoods();
+    const [privateRows, seededRows] = await Promise.all([dbGetFoods(), dbGetGroupFoods()]);
+    const rows = [...privateRows, ...seededRows];
     return rows.map(_foodFromDb);
   },
 
   async getGroupFoods() {
-    const { dbGetGroupFoods } = await import('./db-native.js');
     const rows = await dbGetGroupFoods();
     return rows.map(_foodFromDb);
   },
@@ -105,23 +105,23 @@ export const NtApiNative = {
   // ── Meals & Recipes ───────────────────────────────────────────────────
 
   async getMeals() {
-    const rows = await dbGetMeals(false);
+    const [privateRows, seededRows] = await Promise.all([dbGetMeals(false), dbGetGroupMeals(false)]);
+    const rows = [...privateRows, ...seededRows];
     return rows.map(_mealFromDb);
   },
 
   async getGroupMeals() {
-    const { dbGetGroupMeals } = await import('./db-native.js');
     const rows = await dbGetGroupMeals(false);
     return rows.map(_mealFromDb);
   },
 
   async getRecipes() {
-    const rows = await dbGetMeals(true);
+    const [privateRows, seededRows] = await Promise.all([dbGetMeals(true), dbGetGroupMeals(true)]);
+    const rows = [...privateRows, ...seededRows];
     return rows.map(_mealFromDb);
   },
 
   async getGroupRecipes() {
-    const { dbGetGroupMeals } = await import('./db-native.js');
     const rows = await dbGetGroupMeals(true);
     return rows.map(_mealFromDb);
   },
