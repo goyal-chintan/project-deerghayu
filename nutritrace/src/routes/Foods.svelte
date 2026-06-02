@@ -19,7 +19,7 @@
   import { API, USDA, NtApi } from '../lib/api.js';
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
-  import { resolveAssetUrl } from '../lib/platform.js';
+  import { resolveAssetUrl, isNative, getNativeMode } from '../lib/platform.js';
   import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit, vegetarianMode } from '../stores/settings.js';
   import { isAllowedInVegMode, inferDietType } from '../lib/dietType.js';
   import { mealIcon } from '../lib/mealIcon.js';
@@ -88,15 +88,17 @@
   let search = '';
   let searchSource = 'local';
   const _mealieEnabled = DB.getSetting('mealieEnabled',  false);
+  $: _isNativeLocal = isNative && getNativeMode() === 'local';
   // OFF / USDA / Mealie are food databases — only meaningful on the Foods tab.
   // Meals + Recipes tabs only get Local + From Others (when shared content exists).
   $: availableSources = [
     { value: 'local',  label: $_('foods.sources.local')  },
-    ...(activeTab === 0 && $offEnabled    ? [{ value: 'off',    label: 'OFF' }] : []),
-    ...(activeTab === 0 && $usdaEnabled   ? [{ value: 'usda',   label: 'USDA' }] : []),
-    ...(activeTab === 0 && _mealieEnabled ? [{ value: 'mealie', label: 'Mealie' }] : []),
+    ...(activeTab === 0 && !_isNativeLocal && $offEnabled    ? [{ value: 'off',    label: 'OFF' }] : []),
+    ...(activeTab === 0 && !_isNativeLocal && $usdaEnabled   ? [{ value: 'usda',   label: 'USDA' }] : []),
+    ...(activeTab === 0 && !_isNativeLocal && _mealieEnabled ? [{ value: 'mealie', label: 'Mealie' }] : []),
     ...(_tabHasShared  ? [{ value: 'shared', label: $_('foods.sources.from_others') }] : []),
   ];
+  $: if (_isNativeLocal && !availableSources.some(s => s.value === searchSource)) searchSource = 'local';
   $: _sourceLabel = availableSources.find(s => s.value === searchSource)?.label || '';
 
   // Sharing — "From Others" source filter (per-category)

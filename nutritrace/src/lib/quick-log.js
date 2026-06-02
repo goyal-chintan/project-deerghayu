@@ -15,6 +15,7 @@ import { get } from 'svelte/store';
 import { DB } from './db.js';
 import { API, NtApi } from './api.js';
 import { callAI, callAIProxy } from './aiChat.js';
+import { isNative, getNativeMode } from './platform.js';
 import { envLocks } from '../stores/settings.js';
 
 // ── Step 1: AI parses the input string into structured items ──────────────
@@ -302,16 +303,18 @@ async function _matchFood(parsedItem) {
   }
 
   // ── 2. OFF fallback ─────────────────────────────────────────────────────
-  try {
-    const offResults = await API.searchByName(query, 1);
-    if (Array.isArray(offResults) && offResults.length > 0) {
-      out.candidates = offResults.slice(0, 5);
-      out.best = offResults[0];
-      out.source = 'off';
-      return out;
+  if (!(isNative && getNativeMode() === 'local')) {
+    try {
+      const offResults = await API.searchByName(query, 1);
+      if (Array.isArray(offResults) && offResults.length > 0) {
+        out.candidates = offResults.slice(0, 5);
+        out.best = offResults[0];
+        out.source = 'off';
+        return out;
+      }
+    } catch (e) {
+      console.warn('[quick-log] OFF search failed:', e.message);
     }
-  } catch (e) {
-    console.warn('[quick-log] OFF search failed:', e.message);
   }
 
   return out;
