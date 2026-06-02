@@ -1,3 +1,5 @@
+<svelte:options runes />
+
 <script>
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
@@ -19,9 +21,9 @@
 
   // ── Photo capture / upload ─────────────────────────────────
   let fileInput;
-  let showCamera  = false;
-  let showUrlInput = false;
-  let photoUrl = '';
+  let showCamera = $state(false);
+  let showUrlInput = $state(false);
+  let photoUrl = $state('');
   function applyPhotoUrl() {
     const url = photoUrl.trim();
     if (url) { food.imgUrl = url; }
@@ -30,10 +32,10 @@
   }
   let cameraVideo = null;
   let cameraStream = null;
-  let showCrop    = false;
-  let cropSrc     = '';
-  let cropImg     = null;
-  let cropBox     = null;
+  let showCrop = $state(false);
+  let cropSrc = $state('');
+  let cropImg = null;
+  let cropBox = null;
   let cropDragging = false, cropStartX, cropStartY, cropOrigL, cropOrigT;
 
   function openGallery() { fileInput && fileInput.click(); }
@@ -149,9 +151,10 @@
     showCrop = false; cropSrc = '';
   }
 
-  export let params = {};
+  let { params } = $props();
+  if (!params) params = {};
 
-  let food = {
+  let food = $state({
     name:'', brand:'', barcode:'', imgUrl:'',
     portion: 100, unit: 'g', categories: [], notes: '', diet_type: 'vegetarian',
     calories: '', kilojoules: '', fat: '', 'saturated-fat': '', 'trans-fat': '', 'polyunsaturated-fat': '', 'monounsaturated-fat': '', carbohydrates: '',
@@ -166,16 +169,16 @@
     // in nutrition._derived on the saved food so the calculator icon
     // survives reloads.
     _derived: {},
-  };
+  });
   let store = 'foodList';
-  let saving = false;
-  let showAllNutrients = false;
-  let contributing = false;
-  let offSuccess = false;
+  let saving = $state(false);
+  let showAllNutrients = $state(false);
+  let contributing = $state(false);
+  let offSuccess = $state(false);
   // Off by default — proportional scaling can surprise users editing a single
   // value (e.g. correcting a typo'd protein gram). User opts in via the link
   // toggle next to the unit selector.
-  let linked = false;
+  let linked = $state(false);
   // Snapshot of values used as the baseline for proportional scaling.
   // Captured the moment the user flips `linked` on, NOT at mount: at
   // mount the food may be empty (new food), and even for edit-food the
@@ -183,20 +186,20 @@
   // it on toggle means the snapshot reflects the user's "lock these
   // proportions in" intent, not whatever was loaded.
   let _snapshot = null;
-  let downloading = false;
-  let downloadSuccess = false;
-  let editorScannerOpen = false;
+  let downloading = $state(false);
+  let downloadSuccess = $state(false);
+  let editorScannerOpen = $state(false);
   // Cached list of the user's foods, used for client-side duplicate-barcode
   // detection. Populated once on mount; refreshed only when the editor saves
   // (so a save+stay-open flow can re-check). Whitespace + leading-zero
   // normalisation matches the picker-page lookup behaviour.
   let _myFoods = [];
-  let duplicateOf = null;
-  let matchedIngredients = [];
-  let ingredientsText = '';
-  $: isNewFood = !(params && params.id);
-  $: hasBarcode = !!(food.barcode && food.barcode.trim());
-  $: isNativeLocal = isNative && getNativeMode() === 'local';
+  let duplicateOf = $state(null);
+  let matchedIngredients = $state([]);
+  let ingredientsText = $state('');
+  let isNewFood = $derived(!(params && params.id));
+  let hasBarcode = $derived(!!(food.barcode && food.barcode.trim()));
+  let isNativeLocal = $derived(isNative && getNativeMode() === 'local');
 
   function _normBarcode(b) {
     return String(b || '').trim().replace(/^0+/, '');
@@ -204,16 +207,17 @@
   // Reactively check for a duplicate barcode in the user's library whenever
   // the field changes. Excludes the food currently being edited so editing
   // an existing food doesn't flag itself.
-  $: {
-    if (!food.barcode || !food.barcode.trim()) {
+  $effect(() => {
+    const bc = food.barcode;
+    if (!bc || !bc.trim()) {
       duplicateOf = null;
     } else if (_myFoods && _myFoods.length) {
-      const codeN = _normBarcode(food.barcode);
+      const codeN = _normBarcode(bc);
       duplicateOf = _myFoods.find(f =>
         f.id !== food.id && f.barcode && _normBarcode(f.barcode) === codeN
       ) || null;
     }
-  }
+  });
 
   // Inline scan handler — populate the barcode field, then auto-prefill the
   // form from OFF if the user hasn't typed anything substantive yet. Skips
@@ -223,7 +227,6 @@
     const code = detail?.code;
     if (!code) return;
     food.barcode = code;
-    food = food;
     const looksEmpty = !food.name?.trim() && !food.brand?.trim() &&
       (food.nutrition == null || Object.keys(food.nutrition || {}).length === 0) &&
       !NUTRIMENTS.some(n => food[n.id] != null && food[n.id] !== '');
@@ -258,7 +261,9 @@
       offProductExists = false;
     }
   }
-  $: if (food.barcode && food.barcode !== _lastCheckedBarcode) _refreshOffPresence();
+  $effect(() => {
+    if (food.barcode && food.barcode !== _lastCheckedBarcode) _refreshOffPresence();
+  });
 
   async function _openOffPage() {
     const url = 'https://world.openfoodfacts.org/product/' + encodeURIComponent(food.barcode);
@@ -395,7 +400,6 @@
         food._derived = { ...food._derived, sodium: true };
       }
     }
-    food = food; // trigger Svelte reactivity
   }
 
   async function downloadFromOFF() {
@@ -453,12 +457,7 @@
       const res = await matchAndCalculateRecipeLocally(ingredientsText, food.portion || 100);
       if (res && res.ingredients) {
         matchedIngredients = res.ingredients;
-        for (const n of NUTRIMENTS) {
-          if (res.nutrition[n.id] != null) {
-            food[n.id] = res.nutrition[n.id];
-          }
-        }
-        food = { ...food };
+        // The $effect above will auto-compute nutrition from the matched estimates
         const { showSuccess: toastSuccess } = await import('../stores/toast.js');
         toastSuccess('Ingredients matched and nutrition calculated!');
       } else {
@@ -471,29 +470,27 @@
     }
   }
 
-  function recalculateNutritionFromMatchedList() {
-    // Reset calculated values to 0
-    for (const n of NUTRIMENTS) {
-      food[n.id] = 0;
-    }
-    matchedIngredients.forEach(item => {
+  // Auto-recompute nutrition whenever matchedIngredients or their estPortion changes.
+  // Uses $effect so it automatically tracks deep changes in the $state array.
+  $effect(() => {
+    const items = matchedIngredients;
+    if (!items || items.length === 0) return;
+    const computed = {};
+    NUTRIMENTS.forEach(id => { computed[id] = 0; });
+    items.forEach(item => {
       const portion = parseFloat(item.estPortion) || 0;
       const portionFactor = portion / (item.portion || 100);
       for (const n of NUTRIMENTS) {
         const val = parseFloat(item.nutrition[n.id]);
         if (!isNaN(val)) {
-          food[n.id] = (food[n.id] || 0) + val * portionFactor;
+          computed[n.id] = (computed[n.id] || 0) + val * portionFactor;
         }
       }
     });
-    // Round to 1 decimal place
     for (const n of NUTRIMENTS) {
-      if (food[n.id] != null) {
-        food[n.id] = Math.round(food[n.id] * 10) / 10;
-      }
+      food[n.id] = Math.round((computed[n.id] || 0) * 10) / 10;
     }
-    food = { ...food };
-  }
+  });
 
 
   onMount(async () => {
@@ -536,7 +533,7 @@
   // Read-only when viewing someone else's shared food. Server returns 403 on
   // PUT regardless, but locking the UI prevents the user from typing into a
   // form that won't save and gives them a single clear action: Save a Copy.
-  $: _readOnly = !!food._shared_by;
+  let _readOnly = $derived(!!food._shared_by);
 
   async function saveAsCopy() {
     saving = true;
@@ -638,14 +635,14 @@
       return ai - bi;
     });
   }
-  $: visibleFields = (() => {
+  let visibleFields = $derived.by(() => {
     const vis = $visibleNutriments;
     const base = vis ? NUTRIMENTS.filter(n => vis.includes(n.id)) : NUTRIMENTS.filter(n => n.default);
     return _applyOrder(base);
-  })();
+  });
 
-  $: allFields = _applyOrder(NUTRIMENTS);
-  $: displayFields = showAllNutrients ? allFields : visibleFields;
+  let allFields = $derived(_applyOrder(NUTRIMENTS));
+  let displayFields = $derived(showAllNutrients ? allFields : visibleFields);
 </script>
 
 <div class="page-shell editor-page">
@@ -936,9 +933,8 @@
                   {/if}
                 </span>
                 <div style="display:flex;align-items:center;gap:6px">
-                  <input class="input" type="number" step="0.1" style="width:75px;padding:6px 8px;text-align:right;height:40px;font-size:13px;border:1px solid var(--border);border-radius:var(--radius-sm,#8px)"
-                    bind:value={item.estPortion}
-                    on:input={recalculateNutritionFromMatchedList} />
+                  <input class="input" type="number" min="0" max="1000" step="1" style="width:75px;padding:6px 8px;text-align:right;height:40px;font-size:13px;border:1px solid var(--border);border-radius:var(--radius-sm,#8px)"
+                    bind:value={item.estPortion} />
                   <span style="color:var(--text-2);font-weight:500">{item.unit}</span>
                 </div>
               </div>
