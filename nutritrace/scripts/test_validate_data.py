@@ -15,6 +15,8 @@ Run: python3 nutritrace/scripts/test_validate_data.py
 """
 import sys
 import os
+import json
+import tempfile
 
 # Add scripts dir to path for importing
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
@@ -318,6 +320,32 @@ assert_eq(vd._safe_num(0), 0, "_safe_num(0) = 0")
 assert_eq(vd._safe_num("hello"), 0, "_safe_num('hello') = 0")
 assert_eq(vd._safe_num(None), 0, "_safe_num(None) = 0")
 assert_eq(vd._safe_num(True), 0, "_safe_num(True) = 0 (bool excluded)")
+
+# -----------------------------------------------------------------------
+# Test 16: CLI validates explicit positional dataset paths
+# -----------------------------------------------------------------------
+print("\n[Test 16] CLI validates explicit positional dataset paths")
+
+with tempfile.TemporaryDirectory() as td:
+    bad_foods = os.path.join(td, "bad-ifct.json")
+    bad_recipes = os.path.join(td, "bad-indb.json")
+    with open(bad_foods, "w", encoding="utf-8") as f:
+        json.dump([{"name": "Broken IFCT row", "code": "BAD001", "nutrition": {}}], f)
+    with open(bad_recipes, "w", encoding="utf-8") as f:
+        json.dump([{"name": "Broken INDB row", "code": "BADR001", "nutrition": {}}], f)
+
+    with open(REPORT_PATH, "r", encoding="utf-8") as f:
+        original_report = f.read()
+    try:
+        bad_run = subprocess.run(
+            [sys.executable, os.path.join(HERE, "validate_data.py"), bad_foods, bad_recipes],
+            capture_output=True, text=True, cwd=os.path.join(HERE, "..")
+        )
+    finally:
+        with open(REPORT_PATH, "w", encoding="utf-8") as f:
+            f.write(original_report)
+    assert_true(bad_run.returncode != 0,
+                "Explicit invalid dataset paths fail validation instead of falling back to canonical files")
 assert_eq(vd._safe_num(False), 0, "_safe_num(False) = 0 (bool excluded)")
 assert_eq(vd._safe_num(float('inf')), 0, "_safe_num(inf) = 0")
 assert_eq(vd._safe_num(float('nan')), 0, "_safe_num(nan) = 0")

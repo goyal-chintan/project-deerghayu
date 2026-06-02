@@ -382,9 +382,18 @@ def sodium_outliers(recipes):
     return out
 
 
-def main():
-    foods = load(IFCT)
-    recipes = load(INDB)
+def _input_paths(argv):
+    if len(argv) == 0:
+        return IFCT, INDB
+    if len(argv) == 2:
+        return argv[0], argv[1]
+    raise SystemExit("Usage: validate_data.py [ifct-foods.json indb-recipes.json]")
+
+
+def main(argv=None):
+    ifct_path, indb_path = _input_paths(sys.argv[1:] if argv is None else argv)
+    foods = load(ifct_path)
+    recipes = load(indb_path)
     supported_keys = load(SUPPORTED_IDS)
     quar = load(QUARANTINE) if os.path.exists(QUARANTINE) else {}
     q_contra = quar.get("energy_macro_contradiction", [])
