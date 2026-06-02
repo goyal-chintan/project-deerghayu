@@ -23,3 +23,13 @@ export function confirmDialog({
     confirmRequest.set({ title, message, confirmText, cancelText, dangerous, resolve });
   });
 }
+
+export function alertDialog({
+  title = 'Notice',
+  message = '',
+  confirmText = 'OK',
+} = {}) {
+  return new Promise(resolve => {
+    confirmRequest.set({ title, message, confirmText, cancelText: '', dangerous: false, hideCancel: true, resolve });
+  });
+}

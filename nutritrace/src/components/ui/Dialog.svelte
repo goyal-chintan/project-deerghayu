@@ -11,6 +11,7 @@
   export let cancelText  = 'Cancel';
   export let dangerous   = false;
   export let confirmDisabled = false;
+  export let hideCancel  = false;
   /** When true, dispatches 'confirm' but doesn't auto-close — caller controls
    *  open lifecycle (used for async confirms that may fail and want to keep
    *  the dialog open). Default false preserves the original auto-close. */
@@ -54,7 +55,9 @@
       {/if}
       <slot />
       <div class="dialog-actions">
-        <button class="btn btn-secondary" on:click={cancel}>{cancelText}</button>
+        {#if !hideCancel}
+          <button class="btn btn-secondary" on:click={cancel}>{cancelText}</button>
+        {/if}
         <button
           class="btn {dangerous ? 'btn-danger' : 'btn-primary'}"
           disabled={confirmDisabled}

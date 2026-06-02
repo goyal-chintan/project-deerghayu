@@ -3,6 +3,7 @@
   import { fade, slide } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
   import { NtApi } from '../lib/api.js';
+  import { confirmDialog, alertDialog } from '../stores/confirmDialog.js';
 
   let members = [];
   let loading = true;
@@ -74,17 +75,18 @@
       showModal = false;
       await fetchMembers();
     } catch (err) {
-      alert('Error saving member');
+      await alertDialog({ title: 'Error', message: 'Error saving member' });
     }
   }
 
   async function remove(id) {
-    if (!confirm('Remove this family member?')) return;
+    const ok = await confirmDialog({ title: 'Remove Family Member?', message: 'Remove this family member?', confirmText: 'Remove', dangerous: true });
+    if (!ok) return;
     try {
       await NtApi.del(`/api/family/${id}`);
       await fetchMembers();
     } catch (err) {
-      alert('Error removing member');
+      await alertDialog({ title: 'Error', message: 'Error removing member' });
     }
   }
 
@@ -155,6 +157,24 @@
 
     return { calories, proteins, carbohydrates, fat };
   })();
+
+  /** Scroll focused input into view above the iOS keyboard. */
+  function focusScroll(node) {
+    function onFocus(e) {
+      const el = e.target;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA')) {
+        setTimeout(() => {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }, 300);
+      }
+    }
+    node.addEventListener('focus', onFocus, true);
+    return {
+      destroy() {
+        node.removeEventListener('focus', onFocus, true);
+      }
+    };
+  }
 
   function getGoalLabel(g) {
     switch (g) {
@@ -266,7 +286,7 @@
         <h3 id="member-modal-title">{form.id ? 'Edit Member' : 'New Member'}</h3>
         <button class="icon-btn" aria-label="Close" on:click={() => showModal=false}><span class="material-symbols-rounded">close</span></button>
       </header>
-      <div class="modal-body">
+      <div class="modal-body" use:focusScroll>
         <label class="input-group">
           <span>Name</span>
           <input type="text" bind:value={form.name} placeholder="e.g. Rahul">
@@ -371,7 +391,7 @@
           </div>
         {/if}
       </div>
-      <footer class="modal-footer">
+      <footer class="modal-footer" style="padding-bottom: calc(var(--space-4) + var(--safe-bottom))">
         <button class="btn" on:click={() => showModal=false}>Cancel</button>
         <button class="primary-btn" on:click={save} disabled={!form.name || !form.age}>Save & Calc Targets</button>
       </footer>
