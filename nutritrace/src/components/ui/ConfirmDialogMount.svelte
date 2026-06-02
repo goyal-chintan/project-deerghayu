@@ -27,6 +27,7 @@
     confirmText={current.confirmText}
     cancelText={current.cancelText}
     dangerous={current.dangerous}
+    hideCancel={current.hideCancel}
     on:confirm={() => finish(true)}
     on:cancel={() => finish(false)}
   />
