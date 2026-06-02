@@ -21,6 +21,26 @@ async function _fetchJson(filename) {
 
 const INDB_PROVENANCE_RE = /INDB 2024\.11, code \S+/;
 
+/**
+ * classifyDiet — classify a dish name as 'non_veg' or 'veg'.
+ *
+ * Uses a regex of known non-vegetarian keywords in English and
+ * Hindi/Urdu (e.g. murgh, machli, jhinga, boti, seekh, nihari,
+ * haleem, biryani, etc.).
+ *
+ * NOTE: biryani and pulao default to non_veg because the most
+ * common / canonical preparation is meat-based; vegetarian variants
+ * are explicitly labelled and can be handled via diet_type overrides.
+ *
+ * @param {string} dishName  e.g. "Murgh curry" or "Aloo gobi"
+ * @returns {'non_veg'|'veg'}
+ */
+export function classifyDiet(dishName) {
+  const name = dishName.toLowerCase();
+  const NON_VEG = /\b(chicken|mutton|fish|prawn|beef|pork|egg|lamb|crab|shrimp|keema|kheema|gosht|meat|murg|murgh|murgi|jhinga|boti|mach|machli|kebab(?!\s*veg)|tikka|seekh|shammi|chapli|reshmi|galouti|pasanda|rogan|vindaloo|nihari|haleem|biryani|pulao(?!\s*veg)|korma|qorma|butter\s*chicken|murgh\s*makhani|tandoori|afghani|kofta)\b/i;
+  return NON_VEG.test(name) ? 'non_veg' : 'veg';
+}
+
 export async function seedNativeIfNeeded(db) {
   // Only seed once per install
   const flag = localStorage.getItem(SEED_FLAG_KEY);
@@ -79,10 +99,8 @@ export async function seedNativeIfNeeded(db) {
         const notes = `INDB 2024.11, code ${recipe.code}` +
           (recipe.serving_unit && recipe.serving_grams != null
             ? ` · 1 ${recipe.serving_unit} (~${recipe.serving_grams} g)` : '');
-        // Simple diet classifier: non-veg keywords
-        const name = recipe.name.toLowerCase();
-        const isNonVeg = /chicken|mutton|fish|prawn|beef|pork|egg|lamb|crab|shrimp|keema|kheema|gosht|meat/.test(name);
-        const dietType = isNonVeg ? 'non-vegetarian' : 'vegetarian';
+        const rawDiet = classifyDiet(recipe.name);
+        const dietType = rawDiet === 'non_veg' ? 'non-vegetarian' : 'vegetarian';
 
         if (exists?.values?.length) {
           const existingNotes = exists.values[0]?.notes || '';
