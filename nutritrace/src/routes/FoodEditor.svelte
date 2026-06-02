@@ -1192,7 +1192,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 32px;
+    min-height: 44px;
     padding: 0 12px;
     border-radius: var(--radius-md);
     background: var(--surface-2);

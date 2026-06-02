@@ -120,6 +120,7 @@ const API = {
         } catch (dbErr) {
           console.warn('[api] Local search failed:', dbErr);
         }
+        return []; // Local native mode is strictly local/offline; do not hit the network or query Open Food Facts.
       }
 
       const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=20&page=${page}`;
