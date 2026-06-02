@@ -29,6 +29,12 @@ jobs:
         run: npm run build
         working-directory: nutritrace
 
+      - name: Sync Capacitor iOS (smoke)
+        working-directory: nutritrace
+        run: |
+          npm install --no-save @capacitor/cli
+          npx cap sync ios --deployment
+
       - name: Test Scan Label Parser
         run: npm run test:scan-label
         working-directory: nutritrace
