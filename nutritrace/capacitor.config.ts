@@ -28,7 +28,7 @@ const config: CapacitorConfig = {
       resize: 'native',
     },
     StatusBar: {
-      style: 'dark',
+      style: 'light',
       backgroundColor: '#0A0B0F',
     },
     CapacitorSQLite: {
