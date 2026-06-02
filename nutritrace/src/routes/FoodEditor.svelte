@@ -13,9 +13,8 @@
   import { takePhoto } from '../lib/camera.js';
   import { isNative } from '../lib/platform.js';
   import BarcodeScanner from '../components/foods/BarcodeScanner.svelte';
-  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks, aiProvider, aiApiKey, aiModel, aiBaseUrl, energyUnit, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
+  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, energyUnit, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
   import { DIET_TYPES, DIET_LABELS } from '../lib/dietType.js';
-  import { callAI, callAIProxy } from '../lib/aiChat.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
 
   // ── Photo capture / upload ─────────────────────────────────
@@ -1207,13 +1206,6 @@
   .scan-label-btn:disabled { opacity: 0.6; cursor: not-allowed; }
   .scan-label-btn .material-symbols-rounded { font-size: 18px; }
 
-  /* progress_activity glyph rotates while the AI vision call is in flight.
-     Same pattern used elsewhere (ConnectionStatus, Wizard) but kept
-     component-scoped. */
-  .scan-icon.spin {
-    animation: spin 1s linear infinite;
-    display: inline-block;
-  }
   @keyframes spin { to { transform: rotate(360deg); } }
 
 </style>
