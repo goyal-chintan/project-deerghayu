@@ -13,6 +13,8 @@ NutriTrace runs as a single Docker container on your own hardware, with a PWA fo
 - **Your data stays on your hardware.** No central server, no cloud sync that can read it; nothing leaves your network unless you opt into a third-party integration (OFF, USDA, Fitbit, etc.).
 - **Open source under AGPL-3.0.** Every line that touches your data is readable.
 
+> **Offline-first by design.** NutriTrace ships with a built-in seed database of **542 raw ingredients** (IFCT 2017) and **984 home-cooked recipes** (INDB 2024.11) — all core features work offline with no internet connection required. Branded and packaged foods can be added on demand via the built-in label scanner.
+
 ---
 
 ![NutriTrace diary view — a full day of food logging with macro bar, per-meal breakdowns, and water tracking](docs/screenshots/01-diary.png)
@@ -109,6 +111,44 @@ NutriTrace runs as a single Docker container on your own hardware, with a PWA fo
 - Local Full Backup (Android local-only mode): self-contained `.zip` with embedded image files for phone-to-phone transfer without a server
 - CSV diary export
 - Import from Waistline (Android nutrition app)
+
+---
+
+## Local Mode & Data Scope
+
+NutriTrace is designed for privacy and offline-first operation. The seed database ships with comprehensive Indian food composition data, and all core features work without an internet connection.
+
+### What works offline
+
+| Dataset | Coverage | Details |
+|---|---|---|
+| **IFCT 2017** | 542 raw ingredients | Dals, rice, vegetables, spices, and staples across 20 food groups with complete data for 34 nutrients |
+| **INDB 2024.11** | 984 home-cooked recipes | Common dishes — dal tadka, paneer butter masala, biryani, sambar, chutneys — with per-serving macros |
+
+These datasets are bundled with the server and require no external API. Searching, logging, and nutrition computations all work offline.
+
+### What needs the label scanner
+
+Branded and packaged foods (ketchup, breakfast cereal, energy bars, packaged snacks), restaurant meals, and any food with a physical nutrition label are **not** part of the seed database. You add them via the **Scan Label** feature, which extracts values from a photo of the nutrition facts panel.
+
+### How to add a new food
+
+1. Open the **Foods** page.
+2. Tap **+** → **Scan label**.
+3. Point your camera at the nutrition facts panel.
+4. Review the parsed values — calories, macros, micros, serving size.
+5. Tap **Save**.
+
+The scanned food is saved to your personal database and is immediately available for logging.
+
+### Privacy
+
+Local mode means **no data leaves your device**. Searching, logging, and nutrition computation all stay on your own hardware. When you use the AI-powered Scan Label feature with a cloud provider (Claude, OpenAI, Gemini), the label photo is uploaded temporarily to that provider for OCR — this requires explicit opt-in. If you point Scan Label at a local model (Ollama, LM Studio, llama.cpp), even the photo stays on your network.
+
+### Limitations
+
+- The diet classifier is **keyword-based** — it categorises foods by matching terms in the name and ingredients against known patterns. If a food is misclassified, you can correct it by editing the food's category.
+- Restaurant meals and packaged foods from other countries may not match Indian nutrition profiles; use Scan Label to enter accurate data from the physical label.
 
 ---
 
@@ -513,6 +553,7 @@ That learned TDEE is then multiplied by your goal factor (Lose −20%, Maintain,
 
 **Future:**
 - **iOS app** — pending hardware and Apple Developer account access (see [Support](#support)).
+- **Seed data expansion** — regional Indian cuisines (South Indian, North Indian, East Indian, West Indian) and street food added to the offline seed database.
 
 For Android install instructions, see [Apps](#apps). Recent releases live on the [Releases page](https://github.com/traceapps/nutritrace/releases).
 
